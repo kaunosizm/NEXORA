@@ -373,3 +373,12 @@ create policy "Community members send messages" on public.community_messages for
 with check (author_id=auth.uid() and private.is_community_member(community_id)
  and exists(select 1 from public.community_rooms r where r.id=community_messages.room_id and r.community_id=community_messages.community_id));
 drop function if exists public.is_community_member(uuid);
+
+ 
+-- Allow authors to undo their own community messages for 15 minutes.
+drop policy if exists "Authors can undo own recent community messages" on public.community_messages;
+create policy "Authors can undo own recent community messages"
+on public.community_messages
+for delete to authenticated
+using (author_id = (select auth.uid()) and created_at >= now() - interval '15 minutes');
+grant delete on public.community_messages to authenticated;
