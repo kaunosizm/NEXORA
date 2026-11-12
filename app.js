@@ -140,7 +140,7 @@
     if(!profileId)return;
     const box=$("profile-view-content");
     box.innerHTML='<div class="loading">Profil yükleniyor...</div>';
-    $("profile-view-dialog").showModal();
+    if(!$("profile-view-dialog").open)$("profile-view-dialog").showModal();
     const {data:p,error}=await db.from("profiles").select("id,username,display_name,bio,avatar_url,created_at").eq("id",profileId).maybeSingle();
     if(error||!p){box.innerHTML='<p class="empty-note">Profil yüklenemedi.</p>';return;}
     let friendship="none";
@@ -158,7 +158,7 @@
     box.querySelector("[data-profile-add]")?.addEventListener("click",async()=>{const r=await db.from("friend_requests").insert({sender_id:user.id,receiver_id:p.id});if(r.error)return toast(r.error.message);toast("Arkadaşlık isteği gönderildi.");showProfileCard(p.id);loadFriends();});
     box.querySelector("[data-profile-message]")?.addEventListener("click",async()=>{$("profile-view-dialog").close();setView("messages");await openDm(p);});
   }
-  document.addEventListener("click",e=>{const el=e.target.closest("[data-profile-view]");if(el){e.preventDefault();showProfileCard(el.dataset.profileView);}});
+  document.addEventListener("click",e=>{const el=e.target.closest("[data-profile-view]");if(el){e.preventDefault();if($("global-search-dialog").open)$("global-search-dialog").close();showProfileCard(el.dataset.profileView);}});
   $("global-search-open").addEventListener("click",()=>{$("global-search-dialog").showModal();$("global-search-input").focus();});
   $("global-search-close").addEventListener("click",()=>$("global-search-dialog").close());
   $("global-search-dialog").addEventListener("click",e=>{if(e.target===$("global-search-dialog"))$("global-search-dialog").close();});
@@ -334,7 +334,7 @@
     $("friend-list").querySelectorAll("[data-open-dm]").forEach(b=>b.addEventListener("click",async()=>{const p=byId.get(b.dataset.openDm);if(p){setView("messages");await openDm(p);}}));
   }
   async function searchFriends(){
-    if(!requireUser())return;const term=$("friend-search").value.trim().replace(/^@/,"").toLowerCase();if(term.length<2){$("friend-search-results").textContent="En az 2 karakter yaz.";return;}
+    if(!requireUser())return;const term=$("friend-search").value.trim().replace(/^@/,"").replace(/[%_,()]/g," ").replace(/\s+/g," ").toLowerCase().trim();if(term.length<2){$("friend-search-results").textContent="En az 2 karakter yaz.";return;}
     const {data,error}=await db.from("profiles").select("id,username,display_name,bio,avatar_url").or("username.ilike.%"+term+"%,display_name.ilike.%"+term+"%").neq("id",user.id).limit(12);if(error){$("friend-search-results").textContent=error.message;return;}if(!data?.length){$("friend-search-results").textContent="Kullanıcı bulunamadı.";return;}
     const [l,r]=await Promise.all([db.from("friendships").select("user_a,user_b").or("user_a.eq."+user.id+",user_b.eq."+user.id),db.from("friend_requests").select("sender_id,receiver_id").eq("status","pending").or("sender_id.eq."+user.id+",receiver_id.eq."+user.id)]);
     const friends=new Set((l.data||[]).map(x=>x.user_a===user.id?x.user_b:x.user_a)),pending=new Set((r.data||[]).map(x=>x.sender_id===user.id?x.receiver_id:x.sender_id));
@@ -521,7 +521,7 @@
     $("room-member-count").textContent=String(communityMembers.length);
     if(!membersResult.error)$("room-member-list").innerHTML=communityMembers.length?communityMembers.map(m=>{
       const p=m.profiles||{},isCommunityFounder=m.user_id===activeCommunity.created_by,isPlatformFounder=m.user_id===FOUNDER_UID;
-      const label=isCommunityFounder?"KURUCU":m.role_name||({admin:"YÖNETİCİ",moderator:"MODERATÖR",member:"ÜYE"}[m.role]||"ÜYE");
+      const label=isCommunityFounder?"KURUCU":isPlatformFounder?"NEXORA KURUCU":m.role_name||({admin:"YÖNETİCİ",moderator:"MODERATÖR",member:"ÜYE"}[m.role]||"ÜYE");
       const canAct=!isCommunityFounder&&m.user_id!==user?.id&&(communityRole==="owner"||communityRole==="admin"||(communityRole==="moderator"&&m.role==="member"));
       return '<div class="room-member"><button type="button" class="room-member-profile" data-profile-view="'+m.user_id+'"><span class="room-member-avatar">'+(p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase()))+'</span><span class="room-member-name"><strong class="'+(isPlatformFounder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong><small>@'+esc(p.username||"uye")+'</small></span></button><span class="room-member-role '+(isCommunityFounder||isPlatformFounder?'founder-name':'')+'" '+(m.role_color?'style="color:'+esc(m.role_color)+'"':'')+'>'+esc(label)+'</span>'+(canAct?'<button class="room-member-manage" type="button" data-manage-member="'+m.user_id+'" data-member-role="'+esc(m.role)+'">•••</button>':'')+'</div>';
     }).join(""):'<p class="empty-note">Henüz üye yok.</p>';
