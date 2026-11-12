@@ -37,7 +37,7 @@
   const setView = (name) => {
     document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
-    const appLayout=document.querySelector(".layout");appLayout.classList.toggle("community-mode",name==="community-room");appLayout.classList.remove("community-nav-open");
+    const appLayout=document.querySelector(".layout");appLayout.classList.toggle("community-mode",name==="community-room");appLayout.classList.remove("community-nav-open");if($("community-menu-toggle"))$("community-menu-toggle").setAttribute("aria-expanded","false");
     if (name === "home") loadHome();
     if (name === "communities") loadCommunities();
     if (name === "friends") loadFriends();
@@ -440,7 +440,7 @@
     await subscribeToActiveRoom();
   }
   async function manageCommunityMember(targetId,targetRole){
-    const choice=prompt("Üye işlemi: 1=Rol ata, 2=Sustur, 3=Yasakla, 4=Üyeyi çıkar");
+    const choice=prompt("Üye işlemi: 1=Rol ata, 2=Sustur, 3=Yasakla, 4=Üyeyi çıkar, 5=Susturmayı kaldır");
     if(!choice)return;
     if(choice==="1"){
       const role=prompt("Yeni rol: member / moderator / admin","member");if(!role)return;
@@ -455,6 +455,9 @@
       const reason=prompt("Sebep (isteğe bağlı):","")||"";
       const r=await db.rpc("community_moderate_member",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_action:choice==="2"?"mute":"ban",p_duration_minutes:mins,p_reason:reason});
       if(r.error)return toast(r.error.message);toast(choice==="2"?"Üye susturuldu.":"Üye topluluktan yasaklandı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
+    }else if(choice==="5"){
+      const r=await db.rpc("community_moderate_member",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_action:"unmute",p_duration_minutes:null,p_reason:""});
+      if(r.error)return toast(r.error.message);toast("Üyenin susturması kaldırıldı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
     }else if(choice==="4"){
       if(!confirm("Bu üyeyi topluluktan çıkarmak istiyor musun?"))return;
       const r=await db.from("community_members").delete().eq("community_id",activeCommunity.id).eq("user_id",targetId);
@@ -508,7 +511,8 @@
     const ids=communityChannels.map(c=>c.id);
     const roomsResult=ids.length?await db.from("community_rooms").select("id,community_id,channel_id,name,topic,created_by,sort_order,created_at").in("channel_id",ids).order("sort_order").order("created_at"):{data:[],error:null};
     if(roomsResult.error){communityChannelError="Odalar alınamadı: "+roomsResult.error.message;$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';communityRooms=[];}else communityRooms=roomsResult.data||[];
-    const canManage=communityRole==="owner"||communityRole==="moderator"||activeCommunity.created_by===user?.id;
+    const canManage=communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity.created_by===user?.id;
+    $("community-settings-open").classList.toggle("hidden",!(communityRole==="owner"||communityRole==="admin"||activeCommunity.created_by===user?.id));
     $("channel-create-toggle").classList.toggle("hidden",!canManage);
     $("room-create-toggle").classList.toggle("hidden",!canManage);
     $("room-member-count").textContent=String(communityMembers.length);
