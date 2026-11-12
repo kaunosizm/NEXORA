@@ -16,7 +16,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [];
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -158,17 +158,21 @@
     }));
   }
   async function updateAuth(session) {
+    const revision = ++authRevision;
     user = session?.user || null;
     $("welcome-screen").classList.toggle("hidden",!!user);
     document.querySelector(".layout").classList.toggle("hidden",!user);
     $("auth-open").classList.add("hidden"); $("user-chip").classList.toggle("hidden",!user);
     if (user) {
-      const {data} = await db.from("profiles").select("id,username,display_name").eq("id",user.id).maybeSingle();
-      profile = data; $("user-chip").innerHTML = data?.id===FOUNDER_UID ? '<span class="founder-name">@'+esc(data.username||"kurucu")+'</span> <span class="founder-badge">♛</span>' : "@"+esc(data?.username || "üye");
+      const {data,error:profileError} = await db.from("profiles").select("id,username,display_name").eq("id",user.id).maybeSingle();
+      if (revision !== authRevision) return;
+      if (profileError) console.error("NEXORA profile lookup:",profileError);
+      profile = data; $("user-chip").innerHTML = data?.id===FOUNDER_UID ? '<span class="founder-name">@'+esc(data.username||"kurucu")+'</span> <span class="founder-badge">♛</span>' : "@"+esc(data?.username || user.email?.split("@")[0] || "üye");
       $("admin-nav").classList.toggle("hidden",user.id!==FOUNDER_UID);
       $("user-chip").title = "Çıkış yap"; $("user-chip").style.cursor="pointer";
       $("user-chip").onclick = async()=>{if(confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}};
     } else { profile=null; $("user-chip").onclick=null; $("admin-nav").classList.add("hidden"); }
+    if (revision !== authRevision) return;
     await Promise.all([loadFeed(),loadCommunities()]);
   }
   $("avatar-file").addEventListener("change", async (e)=>{
@@ -246,9 +250,20 @@
     const members=await db.from("profiles").select("id,username,display_name,created_at").order("created_at",{ascending:false}).limit(12);
     $("admin-member-list").innerHTML=members.error?'<div class="loading">'+esc(members.error.message)+'</div>':(members.data||[]).map(m=>'<div class="admin-member"><div><strong>'+esc(m.display_name||m.username)+'</strong> '+(m.id===FOUNDER_UID?'<span class="founder-badge">♛ KURUCU</span>':'')+'<small>@'+esc(m.username)+'</small></div><time>'+esc(when(m.created_at))+'</time></div>').join("")||'<div class="loading">Henüz üye yok.</div>';
   }
-  db.auth.onAuthStateChange((_event,session)=>{ updateAuth(session); });
+  // Supabase auth callback içinde başka Supabase sorgusu çalıştırma: kilitlenmeyi önlemek için sonraki göreve bırak.
+  db.auth.onAuthStateChange((_event,session)=>{
+    window.setTimeout(()=>{ updateAuth(session).catch(err=>{ console.error("NEXORA auth update:",err); toast("Oturum güncellenemedi. Sayfayı yenilemeyi dene."); }); },0);
+  });
   (async()=>{
-    try { const {data,error}=await db.auth.getSession(); if(error)throw error; setConnection(true,"Supabase bağlı"); await updateAuth(data.session); }
-    catch(err){setConnection(false,"Bağlantı hatası");$("feed-list").innerHTML='<div class="loading">'+esc(err.message)+'</div>';}
+    try {
+      const {data,error}=await db.auth.getSession();
+      if(error)throw error;
+      setConnection(true,"Supabase bağlı");
+      await updateAuth(data.session);
+    } catch(err) {
+      setConnection(false,"Bağlantı hatası");
+      $("feed-list").innerHTML='<div class="loading">'+esc(err.message)+'</div>';
+      console.error("NEXORA session bootstrap:",err);
+    }
   })();
 })();
