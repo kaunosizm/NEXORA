@@ -137,3 +137,92 @@
 .community-request-row strong{font-size:12px}.community-request-row small{display:block;color:var(--muted);font-size:10px;margin-top:4px}
 .community-request-row .btn{padding:8px 11px;font-size:10px}
 @media(max-width:650px){.settings-card{padding:17px}.community-request-row{align-items:flex-start;flex-direction:column}.community-request-row>div:last-child{display:flex;gap:7px}}
+
+
+/* NEXORA community-first home, account settings, friends and DMs */
+.home-hero{position:relative;overflow:hidden;padding:clamp(30px,5vw,58px);margin:4px 0 34px;border:1px solid #a879ff35;border-radius:26px;background:radial-gradient(ellipse at 80% 10%,#55d8ed16,transparent 42%),linear-gradient(135deg,#17172a,#101827 72%);box-shadow:0 22px 70px #0003}
+.home-hero:after{content:"N";position:absolute;right:5%;top:-35%;font:800 clamp(190px,30vw,340px)/1 "Space Grotesk";color:#ffffff05;pointer-events:none}
+.home-hero .eyebrow,.home-hero h1,.home-hero p,.home-hero-actions{position:relative;z-index:1}
+.home-hero h1{font:700 clamp(54px,9vw,100px)/1 "Space Grotesk";letter-spacing:-5px;margin:15px 0}
+.home-hero p{font-size:14px;color:#aab4ca;max-width:550px;line-height:1.8;margin:0}
+.home-hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+.text-link{border:0;background:none;color:#c6adff;font-size:11px;font-weight:700;padding:8px;cursor:pointer}
+.home-friends-strip{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:22px;margin-top:24px}
+.home-friends-strip h2{font:700 20px "Space Grotesk";margin:8px 0 5px}
+.home-friends-strip p{color:var(--muted);font-size:12px;margin:0}
+.settings-card{width:100%;max-width:720px;margin:0 auto 18px;padding:clamp(20px,3vw,30px);gap:18px;align-items:stretch;box-sizing:border-box}
+.settings-card>*{min-width:0;max-width:100%}
+.settings-card-heading{display:flex;align-items:flex-start;gap:15px;margin-bottom:3px}
+.settings-card-heading>div{min-width:0}
+.settings-card-heading h2,.settings-card h2{font:700 21px/1.25 "Space Grotesk";margin:5px 0 7px;overflow-wrap:anywhere}
+.settings-card p{font-size:12px;line-height:1.7;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.settings-icon{width:44px;height:44px;flex:0 0 44px;border-radius:14px;display:grid;place-items:center;background:#a879ff20;color:#d4c0ff;font-size:22px}
+.settings-card label{display:grid;gap:8px;width:100%;min-width:0;font-size:12px;color:#cbd2e5;font-weight:600}
+.settings-card input{display:block;width:100%;min-width:0;max-width:100%;height:46px;padding:0 14px;line-height:normal;border:1px solid var(--line);border-radius:11px;background:#0c101b;color:var(--text);font-size:13px}
+.settings-card .btn{justify-self:start;max-width:100%}
+.settings-card .form-message{min-height:16px;overflow-wrap:anywhere}
+.settings-help{display:block;color:#8f9ab2;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+.mfa-status{width:100%;box-sizing:border-box}
+.mfa-setup{width:100%;min-width:0;box-sizing:border-box}
+.mfa-setup img{display:block;max-width:100%}
+.mfa-setup form{width:100%;min-width:0}
+.mfa-setup form label{min-width:0}
+.friends-search-card,.friends-panel{padding:20px;margin-bottom:16px}
+.friends-search-card>label{display:block;color:#cbd2e5;font-size:12px;font-weight:700;margin-bottom:9px}
+.friends-search-row{display:flex;gap:9px;align-items:center}
+.friends-search-row input{flex:1;min-width:0;height:43px;background:#0c101b;border:1px solid var(--line);border-radius:10px;padding:0 13px;color:var(--text)}
+.friends-panel h2{font:700 17px "Space Grotesk";margin:0 0 12px}
+.friend-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-top:1px solid var(--line);min-width:0}
+.friend-person{display:grid;gap:4px;min-width:0}
+.friend-person strong{font-size:12px;overflow-wrap:anywhere}
+.friend-person small{font-size:10px;color:var(--muted)}
+.friend-actions{display:flex;gap:7px;flex-wrap:wrap}
+.friend-actions .btn,.friend-row>.btn{padding:9px 12px;font-size:10px;flex-shrink:0}
+.request-pending,.empty-note{font-size:11px;color:var(--muted)}
+.empty-note{padding:10px 0;margin:0}
+.dm-layout{display:grid;grid-template-columns:minmax(180px, .36fr) minmax(0,1fr);min-height:570px;overflow:hidden}
+.dm-conversations{border-right:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.dm-contact{display:grid;gap:4px;text-align:left;padding:13px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--text);cursor:pointer}
+.dm-contact:hover,.dm-contact.active{background:#a879ff14;border-color:#a879ff30}
+.dm-contact strong{font-size:12px}.dm-contact small{font-size:10px;color:var(--muted)}.dm-contact span{font-size:10px;color:#8e99b0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dm-thread{display:grid;grid-template-rows:auto minmax(250px,1fr) auto;min-width:0}
+.dm-thread-head{padding:17px;border-bottom:1px solid var(--line);display:grid;gap:4px;font-size:13px}
+.dm-thread-head small{font-size:10px;color:var(--muted)}
+.dm-thread-messages{padding:18px;display:flex;flex-direction:column;gap:10px;overflow:auto;max-height:470px;min-width:0}
+.dm-bubble{align-self:flex-start;max-width:82%;padding:10px 13px;border:1px solid var(--line);border-radius:4px 14px 14px 14px;background:#ffffff08;overflow-wrap:anywhere}
+.dm-bubble.mine{align-self:flex-end;background:#9d75ff20;border-color:#a879ff45;border-radius:14px 4px 14px 14px}
+.dm-bubble p{font-size:12px;line-height:1.6;white-space:pre-wrap;margin:0}
+.dm-bubble small{display:block;text-align:right;font-size:9px;color:#8994ac;margin-top:6px}
+.dm-compose{display:flex;gap:8px;padding:13px;border-top:1px solid var(--line)}
+.dm-compose input{flex:1;min-width:0;height:44px;background:#0c101b;border:1px solid var(--line);border-radius:11px;padding:0 12px;color:var(--text)}
+.icon-action{width:42px;height:42px;flex:0 0 42px;border:1px solid var(--line);border-radius:12px;background:#1a2030;color:#d6c5ff;display:inline-grid;place-items:center;font-size:19px;cursor:pointer}
+.icon-action:hover{border-color:#a879ff88;background:#a879ff1c}
+.send-action{background:linear-gradient(140deg,#b18aff,#63d8e8);color:#0b0d17;border:0;font-size:20px}
+.send-action:disabled{opacity:.45;cursor:not-allowed}
+.room-input-row{display:flex;align-items:stretch;gap:9px;min-width:0}
+.room-input-row textarea{flex:1;min-width:0;min-height:52px;max-height:180px;resize:vertical}
+.room-compose-actions{display:flex;align-items:center;gap:9px}
+.room-compose-actions .icon-action{font-size:18px}
+.room-compose-actions .muted{min-width:0;overflow-wrap:anywhere}
+.room-attach{display:none!important}
+@media(max-width:650px){
+ .home-hero{padding:27px 21px;margin-bottom:26px;border-radius:20px}
+ .home-hero h1{font-size:58px;letter-spacing:-3px}
+ .home-friends-strip{align-items:flex-start;flex-direction:column}
+ .settings-card{padding:19px;gap:15px}
+ .settings-card-heading{gap:11px}
+ .settings-card-heading h2{font-size:18px}
+ .friends-search-card,.friends-panel{padding:15px}
+ .friend-row{align-items:flex-start;flex-direction:column;gap:9px}
+ .friend-row>.btn{align-self:flex-start}
+ .dm-layout{grid-template-columns:105px minmax(0,1fr);min-height:520px}
+ .dm-conversations{padding:6px}
+ .dm-contact{padding:10px 7px}
+ .dm-contact strong{font-size:10px;overflow-wrap:anywhere}
+ .dm-contact small{font-size:9px}
+ .dm-thread-messages{padding:12px}
+ .dm-compose{padding:9px}
+ .dm-compose input{font-size:11px}
+ .icon-action{width:38px;height:40px;flex-basis:38px}
+ .room-compose{padding:11px}
+}
