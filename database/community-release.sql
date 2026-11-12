@@ -202,25 +202,31 @@ grant execute on function public.community_update_settings(uuid,boolean,text[],i
 
 -- Extend channel/room management to admins as well as owners and moderators.
 drop policy if exists "Community owners create channels" on public.community_channels;
+drop policy if exists "Community managers create channels" on public.community_channels;
 create policy "Community managers create channels" on public.community_channels for insert to authenticated
 with check (created_by=auth.uid() and exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator')));
 drop policy if exists "Community owners update channels" on public.community_channels;
+drop policy if exists "Community managers update channels" on public.community_channels;
 create policy "Community managers update channels" on public.community_channels for update to authenticated
 using (exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator')))
 with check (exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator')));
 drop policy if exists "Community owners delete channels" on public.community_channels;
+drop policy if exists "Community managers delete channels" on public.community_channels;
 create policy "Community managers delete channels" on public.community_channels for delete to authenticated
 using (exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator')));
 drop policy if exists "Community owners create rooms" on public.community_rooms;
+drop policy if exists "Community managers create rooms" on public.community_rooms;
 create policy "Community managers create rooms" on public.community_rooms for insert to authenticated
 with check (created_by=auth.uid() and exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator'))
  and exists(select 1 from public.community_channels ch where ch.id=community_rooms.channel_id and ch.community_id=community_rooms.community_id));
 drop policy if exists "Community owners update rooms" on public.community_rooms;
+drop policy if exists "Community managers update rooms" on public.community_rooms;
 create policy "Community managers update rooms" on public.community_rooms for update to authenticated
 using (exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator')))
 with check (exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator'))
  and exists(select 1 from public.community_channels ch where ch.id=community_rooms.channel_id and ch.community_id=community_rooms.community_id));
 drop policy if exists "Community owners delete rooms" on public.community_rooms;
+drop policy if exists "Community managers delete rooms" on public.community_rooms;
 create policy "Community managers delete rooms" on public.community_rooms for delete to authenticated
 using (exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','admin','moderator')));
 
