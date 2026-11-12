@@ -18,9 +18,24 @@
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
   <header class="topbar">
     <a class="brand" href="#" aria-label="NEXORA ana sayfa"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></a>
-    <div class="top-actions"><span id="connection-state" class="connection"><i></i> Bağlanıyor</span><button id="auth-open" class="btn btn-primary">Giriş yap</button><div id="user-chip" class="user-chip hidden"></div></div>
+    <div class="top-actions"><span id="connection-state" class="connection hidden"><i></i> Bağlanıyor</span><button id="auth-open" class="btn btn-primary" style="display:none">Giriş yap</button><div id="user-chip" class="user-chip hidden"></div></div>
   </header>
-  <div class="layout">
+  <section id="welcome-screen" class="welcome-screen">
+    <div class="welcome-glow"></div>
+    <div class="welcome-content">
+      <div class="welcome-kicker"><span></span> YENİ NESİL TOPLULUK PLATFORMU</div>
+      <div class="welcome-logo">NEXORA<span>.</span></div>
+      <h1>İnternetin yeni buluşma noktası.<br><span>Senin topluluğun, senin dünyan.</span></h1>
+      <p>NEXORA sizin platformunuz. İlgi alanlarını keşfedin, fikirlerinizi özgürce paylaşın ve aynı tutkuları taşıyan insanlarla bir araya gelin. Burada her fikir yeni bir topluluğun başlangıcı olabilir.</p>
+      <div class="welcome-actions">
+        <button id="welcome-login" class="btn btn-primary">Giriş Yap <b>↗</b></button>
+        <button id="welcome-register" class="btn btn-outline">Kayıt Ol</button>
+      </div>
+      <div class="welcome-foot"><span>✦</span> Birlikte keşfet. Birlikte üret. Birlikte büyü.</div>
+    </div>
+    <div class="welcome-art" aria-hidden="true"><div class="welcome-ring ring-one"></div><div class="welcome-ring ring-two"></div><div class="welcome-core">N</div><i class="spark spark-one">✦</i><i class="spark spark-two">✧</i><i class="spark spark-three">·</i></div>
+  </section>
+  <div class="layout hidden">
     <aside class="sidebar">
       <div class="side-label">MENÜ</div>
       <button class="nav-item active" data-view="feed"><span>⌂</span> Akış</button>
