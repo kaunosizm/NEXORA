@@ -343,3 +343,33 @@ with check (author_id=auth.uid() and public.is_community_member(community_id)
 grant select on public.community_channels,public.community_rooms to authenticated;
 grant insert,update,delete on public.community_channels,public.community_rooms to authenticated;
 grant select,insert on public.community_messages to authenticated;
+
+ 
+-- Keep the membership helper outside the exposed Data API schema.
+create schema if not exists private;
+create or replace function private.is_community_member(p_community_id uuid)
+returns boolean language sql stable security definer set search_path=''
+as $$
+ select auth.uid() is not null and exists(select 1 from public.community_members m
+ where m.community_id=p_community_id and m.user_id=auth.uid());
+$$;
+revoke all on function private.is_community_member(uuid) from public,anon;
+grant usage on schema private to authenticated;
+grant execute on function private.is_community_member(uuid) to authenticated;
+drop policy if exists "Community members read channels" on public.community_channels;
+create policy "Community members read channels" on public.community_channels for select to authenticated
+using (private.is_community_member(community_id));
+drop policy if exists "Community members read rooms" on public.community_rooms;
+create policy "Community members read rooms" on public.community_rooms for select to authenticated
+using (private.is_community_member(community_id));
+drop policy if exists "Community members see all members" on public.community_members;
+create policy "Community members see all members" on public.community_members for select to authenticated
+using (private.is_community_member(community_id));
+drop policy if exists "Community members read messages" on public.community_messages;
+create policy "Community members read messages" on public.community_messages for select to authenticated
+using (private.is_community_member(community_id));
+drop policy if exists "Community members send messages" on public.community_messages;
+create policy "Community members send messages" on public.community_messages for insert to authenticated
+with check (author_id=auth.uid() and private.is_community_member(community_id)
+ and exists(select 1 from public.community_rooms r where r.id=community_messages.room_id and r.community_id=community_messages.community_id));
+drop function if exists public.is_community_member(uuid);
