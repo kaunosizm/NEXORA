@@ -16,7 +16,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -39,6 +39,7 @@
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
     if (name === "communities") loadCommunities();
     if (name === "profile") loadProfile();
+    if (name === "settings") loadSettings();
     if (name === "explore") loadExplore();
     if (name === "admin") loadAdmin();
     window.scrollTo({top:0,behavior:"smooth"});
@@ -51,6 +52,79 @@
   $("auth-close").addEventListener("click", () => $("auth-dialog").close());
   $("auth-switch").addEventListener("click", () => showAuth(authMode === "signup" ? "login" : "signup"));
   $("refresh-feed").addEventListener("click", loadFeed);
+  $("password-change-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); if (!requireUser()) return;
+    const currentPassword=$("current-password").value;
+    const newPassword=$("new-password").value;
+    const confirmPassword=$("confirm-password").value;
+    const message=$("password-change-message");
+    if(newPassword.length<8){message.textContent="Yeni şifre en az 8 karakter olmalı.";return;}
+    if(newPassword!==confirmPassword){message.textContent="Yeni şifreler eşleşmiyor.";return;}
+    const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;message.textContent="Şifre doğrulanıyor...";
+    try{
+      const {error}=await db.auth.updateUser({password:newPassword,currentPassword});
+      if(error)throw error;
+      e.currentTarget.reset();message.textContent="Şifren başarıyla güncellendi.";toast("Şifren güncellendi.");
+    }catch(err){message.textContent=err.message||"Şifre güncellenemedi.";}
+    finally{button.disabled=false;}
+  });
+  $("mfa-start").addEventListener("click", async()=>{
+    if(!requireUser())return;
+    $("mfa-start").disabled=true;
+    try{
+      const {data,error}=await db.auth.mfa.enroll({factorType:"totp",friendlyName:"NEXORA Authenticator"});
+      if(error)throw error;
+      mfaSetupFactorId=data.id;
+      const challenge=await db.auth.mfa.challenge({factorId:data.id});
+      if(challenge.error)throw challenge.error;
+      mfaSetupChallengeId=challenge.data.id;
+      $("mfa-qr").src=data.totp.qr_code;
+      $("mfa-secret").textContent=data.totp.secret;
+      $("mfa-setup").classList.remove("hidden");
+      $("mfa-start").classList.add("hidden");
+      $("mfa-status").textContent="Kurulum bekleniyor — uygulamandaki kodu doğrula.";
+    }catch(err){toast("2FA başlatılamadı: "+(err.message||"Bilinmeyen hata"));}
+    finally{$("mfa-start").disabled=false;}
+  });
+  $("mfa-verify-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!mfaSetupFactorId||!mfaSetupChallengeId)return;
+    const code=$("mfa-setup-code").value.trim();
+    if(!/^[0-9]{6}$/.test(code))return toast("6 haneli kodu gir.");
+    const {error}=await db.auth.mfa.verify({factorId:mfaSetupFactorId,challengeId:mfaSetupChallengeId,code});
+    if(error)return toast("Kod doğrulanamadı: "+error.message);
+    mfaSetupFactorId=null;mfaSetupChallengeId=null;$("mfa-setup").classList.add("hidden");$("mfa-setup-code").value="";
+    toast("İki faktörlü doğrulama etkinleştirildi.");await loadSettings();
+  });
+  $("mfa-disable").addEventListener("click",async()=>{
+    const factors=await db.auth.mfa.listFactors();
+    const factor=(factors.data?.totp||[]).find(x=>x.status==="verified");
+    if(!factor)return toast("Etkin doğrulama yöntemi bulunamadı.");
+    const code=prompt("Authenticator uygulamandaki 6 haneli kodu gir:");
+    if(!code)return;
+    if(!/^[0-9]{6}$/.test(code))return toast("Geçerli 6 haneli kod gir.");
+    const challenge=await db.auth.mfa.challenge({factorId:factor.id});
+    if(challenge.error)return toast(challenge.error.message);
+    const verified=await db.auth.mfa.verify({factorId:factor.id,challengeId:challenge.data.id,code});
+    if(verified.error)return toast("Kod doğrulanamadı: "+verified.error.message);
+    const removed=await db.auth.mfa.unenroll({factorId:factor.id});
+    if(removed.error)return toast(removed.error.message);
+    toast("İki faktörlü doğrulama kapatıldı.");await loadSettings();
+  });
+  $("mfa-login-form").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const factorId=$("mfa-login-form").dataset.factorId;
+    const challengeId=$("mfa-login-form").dataset.challengeId;
+    const code=$("mfa-login-code").value.trim();
+    if(!/^[0-9]{6}$/.test(code)){$("mfa-login-message").textContent="6 haneli kod gir.";return;}
+    const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;$("mfa-login-message").textContent="Kod kontrol ediliyor...";
+    try{
+      const {error}=await db.auth.mfa.verify({factorId,challengeId,code});
+      if(error)throw error;
+      $("mfa-login-dialog").close();mfaLoginActive=false;$("mfa-login-code").value="";
+      const session=await db.auth.getSession();if(session.error)throw session.error;await updateAuth(session.data.session);
+    }catch(err){$("mfa-login-message").textContent=err.message||"Kod doğrulanamadı.";}
+    finally{button.disabled=false;}
+  });
   $("room-back").addEventListener("click",()=>setView("communities"));
   $("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const email = $("auth-email").value.trim(); const password = $("auth-password").value;
@@ -85,7 +159,7 @@
     const name = $("community-name").value.trim();
     const slug = $("community-slug").value.trim().toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
     if (slug.length < 3) return toast("Topluluk adresi en az 3 karakter olmalı.");
-    const {data,error} = await db.from("communities").insert({name,slug,description:$("community-description").value.trim(),created_by:user.id,visibility:"public"}).select("id").single();
+    const {data,error} = await db.from("communities").insert({name,slug,description:$("community-description").value.trim(),created_by:user.id,visibility:$("community-visibility").value}).select("id").single();
     if (error) return toast(error.message);
     const join = await db.from("community_members").insert({community_id:data.id,user_id:user.id,role:"owner"});
     if (join.error) return toast("Topluluk oluştu ancak üyelik kaydedilemedi: " + join.error.message);
@@ -142,24 +216,93 @@
   }
   async function loadCommunities() {
     $("community-list").innerHTML = '<div class="loading">Topluluklar yükleniyor...</div>';
-    const {data,error} = await db.from("communities").select("id,name,slug,description,created_at,created_by").eq("visibility","public").order("created_at",{ascending:false}).limit(60);
+    const {data,error} = await db.from("communities").select("id,name,slug,description,created_at,created_by,visibility").order("created_at",{ascending:false}).limit(60);
     if (error) { $("community-list").innerHTML = '<div class="loading">'+esc(error.message)+'</div>'; return; }
     $("community-count").textContent = (data||[]).length+" topluluk";
     $("side-community-count").textContent = (data||[]).length;
     if (!data?.length) { $("community-list").innerHTML = '<div class="card loading">Henüz topluluk yok. İlk topluluğu sen oluştur!</div>'; return; }
     let joined = new Set();
-    if (user) { const {data:members} = await db.from("community_members").select("community_id").eq("user_id",user.id); joined = new Set((members||[]).map(m=>m.community_id)); }
-    $("community-list").innerHTML = data.map((c,i)=>`<article class="card community-card"><div class="community-symbol">${["✦","◈","⌘","✧"][i%4]}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${joined.has(c.id)?`<button class="btn btn-primary" data-open-community="${c.id}">Topluluğu aç ↗</button>`:`<button class="btn btn-quiet" data-join="${c.id}">Topluluğa katıl +</button>`}</div></article>`).join("");
+    let ownRequests=new Map();
+    let pendingRequests=[];
+    if(user){
+      const [membersResult,ownResult,ownerResult]=await Promise.all([
+        db.from("community_members").select("community_id").eq("user_id",user.id),
+        db.from("community_join_requests").select("community_id,status").eq("user_id",user.id),
+        db.from("community_join_requests").select("id,community_id,user_id,created_at,profiles!community_join_requests_user_id_fkey(username,display_name),communities!community_join_requests_community_id_fkey(name)").eq("status","pending").order("created_at",{ascending:true})
+      ]);
+      joined=new Set((membersResult.data||[]).map(m=>m.community_id));
+      ownRequests=new Map((ownResult.data||[]).map(r=>[r.community_id,r.status]));
+      pendingRequests=ownerResult.data||[];
+    }
+    $("community-list").innerHTML = data.map((c,i)=>{
+      const isPrivate=c.visibility==="private";
+      const action=joined.has(c.id)?`<button class="btn btn-primary" data-open-community="${c.id}">Topluluğu aç ↗</button>`:
+        (isPrivate?(ownRequests.has(c.id)?`<button class="btn btn-quiet" disabled>${ownRequests.get(c.id)==="pending"?"İstek gönderildi":"İstek: "+(ownRequests.get(c.id)==="approved"?"onaylandı":"reddedildi")}</button>`:`<button class="btn btn-quiet" data-request="${c.id}">Katılma isteği gönder</button>`):`<button class="btn btn-quiet" data-join="${c.id}">Topluluğa katıl +</button>`);
+      return `<article class="card community-card"><div class="community-symbol">${["✦","◈","⌘","✧"][i%4]}</div><div class="community-visibility">${isPrivate?"🔒 GİZLİ":"● HERKESE AÇIK"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${action}</div></article>`;
+    }).join("");
     $("community-list").querySelectorAll("[data-open-community]").forEach(btn=>btn.addEventListener("click",()=>openCommunity(data.find(c=>c.id===btn.dataset.openCommunity))));
     $("community-list").querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return; const {error:joinError}=await db.from("community_members").insert({community_id:btn.dataset.join,user_id:user.id,role:"member"});
       if(joinError && !joinError.message.includes("duplicate"))return toast(joinError.message);
       toast("Topluluğa katıldın!"); loadCommunities();
     }));
+    $("community-list").querySelectorAll("[data-request]").forEach(btn=>btn.addEventListener("click",async()=>{
+      if(!requireUser())return;
+      const {error:requestError}=await db.from("community_join_requests").insert({community_id:btn.dataset.request,user_id:user.id,status:"pending"});
+      if(requestError)return toast(requestError.message);
+      toast("Katılma isteğin gönderildi.");loadCommunities();
+    }));
+    const requestBox=$("community-requests");
+    requestBox.classList.toggle("hidden",!pendingRequests.length);
+    $("community-request-list").innerHTML=pendingRequests.map(r=>`<div class="community-request-row"><div><strong>${esc(r.profiles?.display_name||r.profiles?.username||"Üye")}</strong><small>@${esc(r.profiles?.username||"üye")} · ${esc(r.communities?.name||"Topluluk")}</small></div><div><button class="btn btn-primary" data-approve-request="${r.id}">Onayla</button> <button class="btn btn-quiet" data-reject-request="${r.id}">Reddet</button></div></div>`).join("");
+    $("community-request-list").querySelectorAll("[data-approve-request]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const request=pendingRequests.find(r=>r.id===btn.dataset.approveRequest);if(!request)return;
+      const joinedResult=await db.from("community_members").insert({community_id:request.community_id,user_id:request.user_id,role:"member"});
+      if(joinedResult.error&&!joinedResult.error.message.includes("duplicate"))return toast(joinedResult.error.message);
+      const updated=await db.from("community_join_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",request.id);
+      if(updated.error)return toast(updated.error.message);
+      toast("Katılma isteği onaylandı.");loadCommunities();
+    }));
+    $("community-request-list").querySelectorAll("[data-reject-request]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const updated=await db.from("community_join_requests").update({status:"rejected",reviewed_at:new Date().toISOString()}).eq("id",btn.dataset.rejectRequest);
+      if(updated.error)return toast(updated.error.message);toast("İstek reddedildi.");loadCommunities();
+    }));
+  }
+  async function loadSettings(){
+    if(!user)return;
+    const {data,error}=await db.auth.mfa.listFactors();
+    if(error){$("mfa-status").textContent="2FA durumu alınamadı: "+error.message;return;}
+    const verified=(data?.totp||[]).filter(f=>f.status==="verified");
+    $("mfa-status").textContent=verified.length?"● İki faktörlü doğrulama etkin":"○ İki faktörlü doğrulama kapalı";
+    $("mfa-start").classList.toggle("hidden",verified.length>0);
+    $("mfa-disable").classList.toggle("hidden",verified.length===0);
   }
   async function updateAuth(session) {
     const revision = ++authRevision;
     user = session?.user || null;
+    if(user){
+      const aal=await db.auth.mfa.getAuthenticatorAssuranceLevel();
+      if(revision!==authRevision)return;
+      if(aal.data?.nextLevel==="aal2"&&aal.data?.currentLevel!=="aal2"){
+        $("welcome-screen").classList.add("hidden");document.querySelector(".layout").classList.add("hidden");
+        $("user-chip").classList.add("hidden");$("auth-open").classList.add("hidden");
+        if(!mfaLoginActive){
+          mfaLoginActive=true;
+          const factors=await db.auth.mfa.listFactors();
+          if(revision!==authRevision)return;
+          const factor=(factors.data?.totp||[]).find(f=>f.status==="verified");
+          if(!factor){$("mfa-login-message").textContent="Doğrulanmış authenticator bulunamadı. Destek için platform yöneticisine başvur.";return;}
+          const challenge=await db.auth.mfa.challenge({factorId:factor.id});
+          if(revision!==authRevision)return;
+          if(challenge.error){$("mfa-login-message").textContent=challenge.error.message;return;}
+          $("mfa-login-form").dataset.factorId=factor.id;$("mfa-login-form").dataset.challengeId=challenge.data.id;
+          $("mfa-login-message").textContent="";$("mfa-login-dialog").showModal();
+        }
+        return;
+      }
+    }
+    mfaLoginActive=false;
+    if($("mfa-login-dialog").open)$("mfa-login-dialog").close();
     $("welcome-screen").classList.toggle("hidden",!!user);
     document.querySelector(".layout").classList.toggle("hidden",!user);
     $("auth-open").classList.add("hidden"); $("user-chip").classList.toggle("hidden",!user);
