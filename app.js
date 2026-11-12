@@ -16,7 +16,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityMembers = [], communityRole = "member", roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityMembers = [], communityRole = "member", communityChannelError = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -418,11 +418,12 @@
       db.from("community_channels").select("id,community_id,name,created_by,sort_order,created_at").eq("community_id",activeCommunity.id).order("sort_order").order("created_at"),
       db.from("community_members").select("user_id,role,joined_at,profiles!community_members_user_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("joined_at")
     ]);
+    communityChannelError=channelsResult.error?.message||null;
     if(channelsResult.error){$("room-channel-list").innerHTML='<p class="empty-note">Kanallar alınamadı: '+esc(channelsResult.error.message)+'</p>';communityChannels=[];}else communityChannels=channelsResult.data||[];
     if(membersResult.error){$("room-member-list").innerHTML='<p class="empty-note">Üyeler alınamadı: '+esc(membersResult.error.message)+'</p>';$("room-member-count").textContent="—";communityMembers=[];}else communityMembers=membersResult.data||[];
     const ids=communityChannels.map(c=>c.id);
     const roomsResult=ids.length?await db.from("community_rooms").select("id,community_id,channel_id,name,topic,created_by,sort_order,created_at").in("channel_id",ids).order("sort_order").order("created_at"):{data:[],error:null};
-    if(roomsResult.error){$("room-channel-list").innerHTML='<p class="empty-note">Odalar alınamadı: '+esc(roomsResult.error.message)+'</p>';communityRooms=[];}else communityRooms=roomsResult.data||[];
+    if(roomsResult.error){communityChannelError="Odalar alınamadı: "+roomsResult.error.message;$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';communityRooms=[];}else communityRooms=roomsResult.data||[];
     const canManage=communityRole==="owner"||communityRole==="moderator"||activeCommunity.created_by===user?.id;
     $("channel-create-toggle").classList.toggle("hidden",!canManage);
     $("room-create-toggle").classList.toggle("hidden",!canManage);
@@ -443,6 +444,7 @@
   }
   function renderCommunityChannels(){
     const canManage=communityRole==="owner"||communityRole==="moderator"||activeCommunity?.created_by===user?.id;
+    if(communityChannelError){$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';return;}
     $("room-channel-list").innerHTML=communityChannels.map(channel=>{
       const rooms=communityRooms.filter(r=>r.channel_id===channel.id);
       return '<div class="room-channel-group"><div class="room-channel-heading"><strong>'+esc(channel.name)+'</strong>'+(canManage?'<button class="room-add-inline" type="button" data-add-room="'+channel.id+'" title="Bu kanala oda ekle">+</button>':'')+'</div>'+rooms.map(room=>'<button type="button" class="room-link '+(activeRoom?.id===room.id?'active':'')+'" data-room-id="'+room.id+'"><span>#</span>'+esc(room.name)+'</button>').join("")+'</div>';
