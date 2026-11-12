@@ -238,3 +238,108 @@ begin
   alter publication supabase_realtime add table public.direct_messages;
  end if;
 end $$;
+
+ 
+-- Community channel and room system.
+create table if not exists public.community_channels (
+  id uuid primary key default gen_random_uuid(),
+  community_id uuid not null references public.communities(id) on delete cascade,
+  name text not null check (char_length(name) between 2 and 32),
+  created_by uuid not null references public.profiles(id) on delete cascade,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (community_id, name)
+);
+create index if not exists community_channels_community_order_idx on public.community_channels(community_id, sort_order, created_at);
+create table if not exists public.community_rooms (
+  id uuid primary key default gen_random_uuid(),
+  community_id uuid not null references public.communities(id) on delete cascade,
+  channel_id uuid not null references public.community_channels(id) on delete cascade,
+  name text not null check (char_length(name) between 2 and 32),
+  topic text not null default '' check (char_length(topic) <= 120),
+  created_by uuid not null references public.profiles(id) on delete cascade,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (channel_id, name),
+  unique (id, community_id)
+);
+create index if not exists community_rooms_channel_order_idx on public.community_rooms(channel_id, sort_order, created_at);
+alter table public.community_messages add column if not exists room_id uuid references public.community_rooms(id) on delete cascade;
+insert into public.community_channels (community_id, name, created_by, sort_order)
+select c.id, 'Genel', c.created_by, 0 from public.communities c
+where not exists (select 1 from public.community_channels ch where ch.community_id=c.id);
+insert into public.community_rooms (community_id, channel_id, name, topic, created_by, sort_order)
+select ch.community_id, ch.id, 'sohbet', 'Topluluğun genel sohbet odası', ch.created_by, 0
+from public.community_channels ch where ch.name='Genel'
+and not exists (select 1 from public.community_rooms r where r.channel_id=ch.id);
+update public.community_messages m set room_id=r.id from public.community_rooms r
+where m.room_id is null and r.community_id=m.community_id and r.name='sohbet';
+alter table public.community_messages alter column room_id set not null;
+create or replace function public.create_default_community_channel()
+returns trigger language plpgsql security definer set search_path=''
+as $$
+declare channel_uuid uuid;
+begin
+ insert into public.community_channels(community_id,name,created_by,sort_order)
+ values(new.id,'Genel',new.created_by,0) returning id into channel_uuid;
+ insert into public.community_rooms(community_id,channel_id,name,topic,created_by,sort_order)
+ values(new.id,channel_uuid,'sohbet','Topluluğun genel sohbet odası',new.created_by,0);
+ return new;
+end; $$;
+drop trigger if exists community_default_channel_after_insert on public.communities;
+create trigger community_default_channel_after_insert after insert on public.communities
+for each row execute function public.create_default_community_channel();
+revoke all on function public.create_default_community_channel() from public,anon,authenticated;
+create or replace function public.is_community_member(p_community_id uuid)
+returns boolean language sql stable security definer set search_path=''
+as $$
+ select auth.uid() is not null and exists(select 1 from public.community_members m
+ where m.community_id=p_community_id and m.user_id=auth.uid());
+$$;
+revoke all on function public.is_community_member(uuid) from public,anon;
+grant execute on function public.is_community_member(uuid) to authenticated;
+alter table public.community_channels enable row level security;
+alter table public.community_rooms enable row level security;
+drop policy if exists "Community members read channels" on public.community_channels;
+create policy "Community members read channels" on public.community_channels for select to authenticated
+using (public.is_community_member(community_id));
+drop policy if exists "Community owners create channels" on public.community_channels;
+create policy "Community owners create channels" on public.community_channels for insert to authenticated
+with check (created_by=auth.uid() and exists(select 1 from public.community_members m
+ where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator')));
+drop policy if exists "Community owners update channels" on public.community_channels;
+create policy "Community owners update channels" on public.community_channels for update to authenticated
+using (exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator')))
+with check (exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator')));
+drop policy if exists "Community owners delete channels" on public.community_channels;
+create policy "Community owners delete channels" on public.community_channels for delete to authenticated
+using (exists(select 1 from public.community_members m where m.community_id=community_channels.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator')));
+drop policy if exists "Community members read rooms" on public.community_rooms;
+create policy "Community members read rooms" on public.community_rooms for select to authenticated
+using (public.is_community_member(community_id));
+drop policy if exists "Community owners create rooms" on public.community_rooms;
+create policy "Community owners create rooms" on public.community_rooms for insert to authenticated
+with check (created_by=auth.uid()
+ and exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator'))
+ and exists(select 1 from public.community_channels ch where ch.id=community_rooms.channel_id and ch.community_id=community_rooms.community_id));
+drop policy if exists "Community owners update rooms" on public.community_rooms;
+create policy "Community owners update rooms" on public.community_rooms for update to authenticated
+using (exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator')))
+with check (exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator'))
+ and exists(select 1 from public.community_channels ch where ch.id=community_rooms.channel_id and ch.community_id=community_rooms.community_id));
+drop policy if exists "Community owners delete rooms" on public.community_rooms;
+create policy "Community owners delete rooms" on public.community_rooms for delete to authenticated
+using (exists(select 1 from public.community_members m where m.community_id=community_rooms.community_id and m.user_id=auth.uid() and m.role in ('owner','moderator')));
+drop policy if exists "Community members see all members" on public.community_members;
+create policy "Community members see all members" on public.community_members for select to authenticated
+using (public.is_community_member(community_id));
+drop policy if exists "Community members read messages" on public.community_messages;
+create policy "Community members read messages" on public.community_messages for select to authenticated
+using (public.is_community_member(community_id));
+drop policy if exists "Community members send messages" on public.community_messages;
+create policy "Community members send messages" on public.community_messages for insert to authenticated
+with check (author_id=auth.uid() and public.is_community_member(community_id)
+ and exists(select 1 from public.community_rooms r where r.id=community_messages.room_id and r.community_id=community_messages.community_id));
+grant select on public.community_channels,public.community_rooms to authenticated;
+grant insert,update,delete on public.community_channels,public.community_rooms to authenticated;
+grant select,insert on public.community_messages to authenticated;
