@@ -580,7 +580,7 @@
   async function loadRoomMessages() {
     if(!activeRoom)return;
     const box=$("room-messages");box.innerHTML='<div class="loading">Mesajlar yükleniyor...</div>';
-    const {data,error}=await db.from("community_messages").select("id,author_id,message_type,content,media_path,created_at,profiles!community_messages_author_id_fkey(username,display_name,avatar_url)").eq("room_id",activeRoom.id).order("created_at",{ascending:true}).limit(150);
+    const {data,error}=await db.from("community_messages").select("id,author_id,message_type,content,media_path,is_pinned,created_at,profiles!community_messages_author_id_fkey(username,display_name,avatar_url)").eq("room_id",activeRoom.id).order("is_pinned",{ascending:false}).order("created_at",{ascending:true}).limit(150);
     if(error){box.innerHTML='<div class="loading">'+esc(error.message)+'</div>';return;}
     if(!data?.length){box.innerHTML='<div class="room-empty">Bu odada henüz mesaj yok. İlk mesajı sen gönder!</div>';return;}
     const rendered=await Promise.all(data.map(async m=>{
@@ -588,9 +588,15 @@
       if(m.media_path){const signed=await db.storage.from("community-media").createSignedUrl(m.media_path,3600);if(!signed.error&&signed.data?.signedUrl){media=m.message_type==="image"?'<img class="room-image" src="'+esc(signed.data.signedUrl)+'" alt="Paylaşılan fotoğraf" loading="lazy">':'<audio class="room-audio" controls preload="none" src="'+esc(signed.data.signedUrl)+'"></audio>';}}
       const p=m.profiles||{},founder=m.author_id===FOUNDER_UID;
       const undoable=m.author_id===user?.id&&Date.now()-new Date(m.created_at).getTime()<=15*60*1000;
-      return '<article class="room-message">'+(p.avatar_url?'<img class="room-avatar" src="'+esc(p.avatar_url)+'" alt="">':'<div class="room-avatar">'+esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())+'</div>')+'<div class="room-message-body"><div class="room-message-head"><strong class="'+(founder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong> '+(founder?'<span class="founder-badge">♛ KURUCU</span>':'')+' <small>@'+esc(p.username||"uye")+' · '+esc(when(m.created_at))+'</small></div>'+(m.content?'<p>'+esc(m.content)+'</p>':'')+media+(undoable?'<div class="room-message-actions"><button type="button" data-undo-message="'+m.id+'">↶ Geri al</button><small>15 dk içinde</small></div>':'')+'</div></article>';
+      return '<article class="room-message">'+(p.avatar_url?'<img class="room-avatar" src="'+esc(p.avatar_url)+'" alt="">':'<div class="room-avatar">'+esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())+'</div>')+'<div class="room-message-body"><div class="room-message-head"><strong class="'+(founder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong> '+(founder?'<span class="founder-badge">♛ KURUCU</span>':'')+(m.is_pinned?'<span class="message-pin-badge">📌 SABİTLENDİ</span>':'')+' <small>@'+esc(p.username||"uye")+' · '+esc(when(m.created_at))+'</small></div>'+(m.content?'<p>'+esc(m.content)+'</p>':'')+media+((undoable||["owner","admin","moderator"].includes(communityRole))?'<div class="room-message-actions">'+(undoable?'<button type="button" data-undo-message="'+m.id+'">↶ Geri al</button><small>15 dk içinde</small>':'')+(["owner","admin","moderator"].includes(communityRole)?'<button type="button" data-pin-message="'+m.id+'" data-pinned="'+String(!!m.is_pinned)+'">'+(m.is_pinned?"Sabitlemeyi kaldır":"📌 Sabitle")+'</button>':'')+'</div>':'')+'</div></article>';
     }));
     box.innerHTML=rendered.join("");box.scrollTop=box.scrollHeight;
+    box.querySelectorAll("[data-pin-message]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const pinned=btn.dataset.pinned==="true";
+      const result=await db.from("community_messages").update({is_pinned:!pinned,pinned_by:pinned?null:user.id}).eq("id",btn.dataset.pinMessage);
+      if(result.error)return toast(result.error.message);
+      toast(pinned?"Mesaj sabitlemesi kaldırıldı.":"Mesaj sabitlendi.");await loadRoomMessages();
+    }));
     box.querySelectorAll("[data-undo-message]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!confirm("Bu mesajı geri almak istiyor musun?"))return;
       const removed=await db.from("community_messages").delete().eq("id",btn.dataset.undoMessage).eq("author_id",user.id);
