@@ -472,6 +472,9 @@
     ]);
     if(settings.error||community.error)return toast((settings.error||community.error).message);
     $("community-setting-name").value=community.data.name||"";
+    const canEditDetails=activeCommunity.created_by===user.id;
+    $("community-setting-name").disabled=!canEditDetails;$("community-setting-description").disabled=!canEditDetails;$("community-setting-visibility").disabled=!canEditDetails;
+    $("community-settings-form").querySelector('button[type="submit"]').classList.toggle("hidden",!(communityRole==="owner"||communityRole==="admin"));
     $("community-setting-description").value=community.data.description||"";
     $("community-setting-visibility").value=community.data.visibility||"public";
     $("community-profanity-filter").checked=settings.data?.profanity_filter??true;
@@ -512,7 +515,7 @@
     const roomsResult=ids.length?await db.from("community_rooms").select("id,community_id,channel_id,name,topic,created_by,sort_order,created_at").in("channel_id",ids).order("sort_order").order("created_at"):{data:[],error:null};
     if(roomsResult.error){communityChannelError="Odalar alınamadı: "+roomsResult.error.message;$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';communityRooms=[];}else communityRooms=roomsResult.data||[];
     const canManage=communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity.created_by===user?.id;
-    $("community-settings-open").classList.toggle("hidden",!(communityRole==="owner"||communityRole==="admin"||activeCommunity.created_by===user?.id));
+    $("community-settings-open").classList.toggle("hidden",!(communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity.created_by===user?.id));
     $("channel-create-toggle").classList.toggle("hidden",!canManage);
     $("room-create-toggle").classList.toggle("hidden",!canManage);
     $("room-member-count").textContent=String(communityMembers.length);
