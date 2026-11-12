@@ -366,3 +366,53 @@
  .global-result-avatar,.global-result-symbol{width:35px;height:35px;flex-basis:35px}
  .global-result .btn{padding:8px;font-size:9px}
 }
+
+/* Release polish: profile cards, community controls and responsive settings dialogs */
+.global-result.profile-result{width:100%;font:inherit;text-align:left;cursor:pointer;color:inherit}
+.global-result.profile-result:hover{border-color:#a879ff88;background:#a879ff12}
+.profile-result-open{font-size:10px;color:#c8b5ff;white-space:nowrap}
+.friend-search-row{align-items:center}
+.friend-person.friend-profile-trigger{display:flex;align-items:center;gap:10px;min-width:0;flex:1;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;padding:0}
+.friend-profile-trigger>span:last-child{display:grid;gap:3px;min-width:0}
+.friend-profile-trigger small{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px}
+.friend-avatar{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:12px;overflow:hidden;background:#a879ff22;color:#e4d7ff;font-weight:800}
+.friend-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-view-dialog,.community-settings-dialog{width:min(680px,calc(100% - 24px));max-height:88vh;overflow:auto}
+.profile-view-box,.community-settings-box{position:relative;padding:28px;display:grid;gap:18px}
+.profile-view-hero{display:flex;align-items:center;gap:17px;padding:10px 0 18px;border-bottom:1px solid var(--line)}
+.profile-view-avatar{width:88px;height:88px;flex:0 0 88px;border-radius:24px;overflow:hidden;display:grid;place-items:center;background:#a879ff24;color:#e6d9ff;font-size:32px;font-weight:800}
+.profile-view-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-view-hero h2{font:700 26px "Space Grotesk";margin:5px 0}
+.profile-view-hero p{color:var(--muted);margin:0;font-size:12px}
+.profile-view-bio{color:#d0d6e5;line-height:1.7;overflow-wrap:anywhere;min-height:44px}
+.profile-view-meta{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px;color:var(--muted);font-size:11px}
+.profile-view-meta strong{color:var(--text)}
+.profile-view-actions{display:flex;justify-content:flex-end;gap:9px}
+.community-settings-box h2{font:700 25px "Space Grotesk";margin:0}
+.settings-intro{font-size:12px;color:var(--muted);margin:-8px 0 0}
+.community-settings-section{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#ffffff04}
+.community-settings-section h3{font:700 13px "Space Grotesk";margin:0;color:#d8c8ff}
+.community-settings-section label{display:grid;gap:7px;font-size:11px;color:#c4cce0}
+.community-settings-section input:not([type=checkbox]),.community-settings-section textarea,.community-settings-section select{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;background:#0c101b;color:var(--text);padding:11px;font:inherit}
+.community-settings-section textarea{min-height:72px;resize:vertical}
+.setting-switch{display:flex!important;align-items:flex-start;gap:11px!important}
+.setting-switch input{width:17px;height:17px;accent-color:#a879ff;margin-top:2px}
+.setting-switch span{display:grid;gap:4px}
+.setting-switch small{color:var(--muted);line-height:1.5}
+.danger-zone{border-color:#b85c6b55}
+.danger-zone h3{color:#ff9eac}
+.danger-zone p{font-size:11px;color:var(--muted);margin:0}
+.btn-danger{border:1px solid #ff788955;background:#ff788914;color:#ffb2bd;padding:10px 13px;border-radius:10px;cursor:pointer}
+.community-settings-actions{display:flex;justify-content:flex-end;gap:9px}
+.room-member{gap:6px}
+.room-member-profile{display:flex;align-items:center;gap:8px;min-width:0;flex:1;border:0;background:transparent;color:inherit;text-align:left;padding:0;cursor:pointer}
+.room-member-manage{width:25px;height:25px;flex:0 0 25px;border:1px solid var(--line);border-radius:7px;background:#ffffff08;color:#c8b5ff;cursor:pointer;font-size:10px}
+.room-member-manage:hover{background:#a879ff22;border-color:#a879ff77}
+@media(max-width:650px){
+ .profile-view-box,.community-settings-box{padding:22px 16px}
+ .profile-view-hero h2{font-size:20px}
+ .profile-view-avatar{width:68px;height:68px;flex-basis:68px;border-radius:19px}
+ .profile-result-open{display:none}
+ .friend-search-row{align-items:flex-start}
+ .community-settings-actions{position:sticky;bottom:-16px;padding:12px 0 0;background:#111522}
+}
