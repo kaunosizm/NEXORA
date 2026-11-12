@@ -536,7 +536,7 @@
     await loadRoomMessages();
   }
   function renderCommunityChannels(){
-    const canManage=communityRole==="owner"||communityRole==="moderator"||activeCommunity?.created_by===user?.id;
+    const canManage=communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity?.created_by===user?.id;
     if(communityChannelError){$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';return;}
     $("room-channel-list").innerHTML=communityChannels.map(channel=>{
       const rooms=communityRooms.filter(r=>r.channel_id===channel.id);
