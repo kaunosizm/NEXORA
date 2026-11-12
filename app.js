@@ -139,7 +139,7 @@
   $("global-search-input").addEventListener("input",()=>{clearTimeout(globalSearchTimer);globalSearchTimer=setTimeout(performGlobalSearch,220);});
   document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("global-search-dialog").showModal();$("global-search-input").focus();}});
   async function performGlobalSearch(){
-    const raw=$("global-search-input").value.trim(),term=raw.replace(/[%_,()]/g," ").replace(/\s+/g," ").trim(),box=$("global-search-results");
+    const raw=$("global-search-input").value.trim(),term=raw.replace(/^@/,"").replace(/[%_,()]/g," ").replace(/\s+/g," ").trim(),box=$("global-search-results");
     if(term.length<2){box.innerHTML='<p class="empty-note">Aramaya başlamak için en az 2 karakter yaz.</p>';return;}
     box.innerHTML='<p class="empty-note">Aranıyor...</p>';
     const wantsProfiles=globalSearchType!=="communities",wantsCommunities=globalSearchType!=="profiles",jobs=[];
