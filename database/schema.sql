@@ -231,3 +231,10 @@ create policy "Friends send direct messages" on public.direct_messages for inser
 grant select,insert on public.friend_requests,public.direct_messages to authenticated;
 grant select on public.friendships to authenticated;
 revoke all on public.friend_requests,public.friendships,public.direct_messages from anon;
+
+do $$
+begin
+ if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='direct_messages') then
+  alter publication supabase_realtime add table public.direct_messages;
+ end if;
+end $$;
