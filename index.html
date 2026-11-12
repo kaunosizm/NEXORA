@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090b14">
+  <meta name="description" content="NEXORA — İlgi alanlarını keşfet, topluluklara katıl ve paylaş.">
+  <title>NEXORA — Topluluğunu Keşfet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="NEXORA ana sayfa"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></a>
+    <div class="top-actions"><span id="connection-state" class="connection"><i></i> Bağlanıyor</span><button id="auth-open" class="btn btn-primary">Giriş yap</button><div id="user-chip" class="user-chip hidden"></div></div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-label">MENÜ</div>
+      <button class="nav-item active" data-view="feed"><span>⌂</span> Akış</button>
+      <button class="nav-item" data-view="explore"><span>⌕</span> Keşfet</button>
+      <button class="nav-item" data-view="communities"><span>◈</span> Topluluklar</button>
+      <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button>
+      <div class="side-card"><div class="side-orb">✦</div><strong>Birlikte daha güçlüyüz.</strong><p>İlgi alanlarını paylaş, yeni insanlarla tanış.</p></div>
+      <div class="side-foot">NEXORA <span>EARLY ACCESS</span><small>© 2026 NEXORA</small></div>
+    </aside>
+    <main class="main">
+      <section id="view-feed" class="view active">
+        <div class="page-heading"><div><div class="eyebrow">TOPLULUĞUN NABZI</div><h1>Akış<span class="gradient-text">.</span></h1><p>Topluluklardan en yeni paylaşımlar.</p></div><button class="btn btn-quiet" id="refresh-feed">↻ Yenile</button></div>
+        <div class="compose card">
+          <div class="compose-avatar">N</div><div class="compose-body"><textarea id="post-content" maxlength="1200" placeholder="Aklından neler geçiyor? Toplulukla paylaş..."></textarea><div class="compose-bottom"><span>Fikirlerini paylaş, sohbeti başlat.</span><button class="btn btn-primary" id="publish-post">Paylaş <b>↗</b></button></div></div>
+        </div>
+        <div id="feed-list" class="feed-list"><div class="loading">Akış yükleniyor<span>...</span></div></div>
+      </section>
+      <section id="view-explore" class="view">
+        <div class="page-heading"><div><div class="eyebrow">YENİ ŞEYLER BUL</div><h1>Keşfet<span class="gradient-text">.</span></h1><p>Yeni fikirler ve topluluklar seni bekliyor.</p></div></div>
+        <div class="card explore-banner"><div><div class="eyebrow">NEXORA DISCOVERY</div><h2>Merak ettiğin şeyin<br><span class="gradient-text">peşinden git.</span></h2><p>İlgi alanlarına göre toplulukları keşfet ve sohbete katıl.</p><button class="btn btn-primary" data-go="communities">Toplulukları keşfet ↗</button></div><div class="orbit-art"><span>✦</span><i></i><b></b></div></div>
+        <h2 class="section-title">Son paylaşımlar</h2><div id="explore-feed" class="feed-list"></div>
+      </section>
+      <section id="view-communities" class="view">
+        <div class="page-heading"><div><div class="eyebrow">AYNI FREKANSTA BULUŞ</div><h1>Topluluklar<span class="gradient-text">.</span></h1><p>İlgini çeken topluluklara katıl veya kendi alanını oluştur.</p></div></div>
+        <form id="community-form" class="card community-create"><div><h2>Yeni bir alan oluştur</h2><p>İlgi alanını bir topluluğa dönüştür.</p></div><div class="form-grid"><input id="community-name" maxlength="48" placeholder="Topluluk adı" required><input id="community-slug" maxlength="56" placeholder="adres-adi" required><textarea id="community-description" maxlength="280" placeholder="Topluluğunu kısaca tanıt..."></textarea></div><button class="btn btn-primary" type="submit">Topluluk oluştur +</button></form>
+        <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><span id="community-count" class="muted"></span></div><div id="community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div>
+      </section>
+      <section id="view-profile" class="view">
+        <div class="page-heading"><div><div class="eyebrow">SENİN ALANIN</div><h1>Profilim<span class="gradient-text">.</span></h1><p>Topluluğa kendini tanıt.</p></div></div>
+        <form id="profile-form" class="card profile-card"><div class="profile-avatar" id="profile-avatar">N</div><div class="profile-fields"><label>Kullanıcı adı<input id="profile-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" required></label><label>Görünen ad<input id="profile-display" maxlength="40" required></label><label>Biyografi<textarea id="profile-bio" maxlength="160" placeholder="Kendinden biraz bahset..."></textarea></label><button class="btn btn-primary" type="submit">Profili kaydet</button></div></form>
+        <div class="card profile-note"><span>✦</span><div><strong>Profilin senin dijital alanın.</strong><p>Kullanıcı adın ve biyografin herkese açık profilinde görüntülenir. E-posta adresin paylaşılmaz.</p></div></div>
+      </section>
+    </main>
+    <aside class="rightbar"><div class="right-card"><div class="right-title">NEXORA NOTU <span>✦</span></div><h3>Her topluluk<br>bir fikirle başlar.</h3><p>İlk gönderini paylaşarak NEXORA'yı birlikte büyütelim.</p></div><div class="right-card mini-card"><div class="right-title">PLATFORM</div><div class="stat-line"><span>Durum</span><strong class="online">● Aktif</strong></div><div class="stat-line"><span>Topluluklar</span><strong id="side-community-count">—</strong></div><div class="stat-line"><span>Paylaşımlar</span><strong id="side-post-count">—</strong></div></div><div class="right-footer">Güvenli ve saygılı bir topluluk<br>oluşturmaya katkı sağla.</div></aside>
+  </div>
+  <dialog id="auth-dialog" class="auth-dialog"><form id="auth-form" class="auth-box"><button type="button" class="dialog-close" id="auth-close">×</button><div class="brand auth-brand"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></div><div class="eyebrow" id="auth-eyebrow">TOPLULUĞA KATIL</div><h2 id="auth-title">Hesabını oluştur.</h2><p id="auth-subtitle">NEXORA'da kendi alanını keşfet.</p><label id="username-wrap">Kullanıcı adı<input id="auth-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" placeholder="ornek_kullanici"></label><label>E-posta<input id="auth-email" type="email" autocomplete="email" required placeholder="ornek@eposta.com"></label><label>Şifre<input id="auth-password" type="password" minlength="8" autocomplete="current-password" required placeholder="En az 8 karakter"></label><button id="auth-submit" class="btn btn-primary btn-wide" type="submit">Hesap oluştur</button><div id="auth-message" class="form-message" role="status"></div><p class="auth-switch"><span id="auth-switch-copy">Zaten hesabın var mı?</span> <button type="button" id="auth-switch">Giriş yap</button></p></form></dialog>
+  <div id="toast" class="toast" role="status"></div>
+</body>
+</html>
