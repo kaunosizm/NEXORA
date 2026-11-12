@@ -277,6 +277,17 @@
     $("mfa-start").classList.toggle("hidden",verified.length>0);
     $("mfa-disable").classList.toggle("hidden",verified.length===0);
   }
+  async function loadSettings(){
+    if(!user)return;
+    const {data,error}=await db.auth.mfa.listFactors();
+    if(error){$("mfa-status").textContent="2FA durumu alınamadı: "+error.message;return;}
+    const verified=(data?.totp||[]).filter(f=>f.status==="verified");
+    const unfinished=(data?.totp||[]).filter(f=>f.status==="unverified");
+    for(const factor of unfinished){await db.auth.mfa.unenroll({factorId:factor.id});}
+    $("mfa-status").textContent=verified.length?"● İki faktörlü doğrulama etkin":"○ İki faktörlü doğrulama kapalı";
+    $("mfa-start").classList.toggle("hidden",verified.length>0);
+    $("mfa-disable").classList.toggle("hidden",verified.length===0);
+  }
   async function updateAuth(session) {
     const revision = ++authRevision;
     user = session?.user || null;
