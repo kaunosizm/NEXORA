@@ -122,7 +122,7 @@
       const {error}=await db.auth.mfa.verify({factorId,challengeId,code});
       if(error)throw error;
       $("mfa-login-dialog").close();mfaLoginActive=false;$("mfa-login-code").value="";
-      const session=await db.auth.getSession();if(session.error)throw session.error;await updateAuth(session.data.session);
+      await syncAuthState();
     }catch(err){$("mfa-login-message").textContent=err.message||"Kod doğrulanamadı.";}
     finally{button.disabled=false;}
   });
@@ -142,6 +142,8 @@
       } else {
         result = await db.auth.signInWithPassword({email,password});
         if (result.error) throw result.error;
+        if (!result.data?.session) throw new Error("Oturum açılamadı. E-posta doğrulaman gerekiyorsa gelen kutunu kontrol et.");
+        await syncAuthState();
         $("auth-dialog").close(); toast("Tekrar hoş geldin!");
       }
     } catch (err) { $("auth-message").textContent = err.message || "Bir hata oluştu."; }
@@ -424,16 +426,29 @@
     const members=await db.from("profiles").select("id,username,display_name,created_at").order("created_at",{ascending:false}).limit(12);
     $("admin-member-list").innerHTML=members.error?'<div class="loading">'+esc(members.error.message)+'</div>':(members.data||[]).map(m=>'<div class="admin-member"><div><strong>'+esc(m.display_name||m.username)+'</strong> '+(m.id===FOUNDER_UID?'<span class="founder-badge">♛ KURUCU</span>':'')+'<small>@'+esc(m.username)+'</small></div><time>'+esc(when(m.created_at))+'</time></div>').join("")||'<div class="loading">Henüz üye yok.</div>';
   }
-  // Supabase auth callback içinde başka Supabase sorgusu çalıştırma: kilitlenmeyi önlemek için sonraki göreve bırak.
-  db.auth.onAuthStateChange((_event,session)=>{
-    window.setTimeout(()=>{ updateAuth(session).catch(err=>{ console.error("NEXORA auth update:",err); toast("Oturum güncellenemedi. Sayfayı yenilemeyi dene."); }); },0);
+  // Auth olaylarını callback dışına taşı ve her seferinde depodaki en güncel oturumu oku.
+  // Böylece ilk yükleme, SIGNED_IN ve token yenileme olayları eski session ile birbirini ezmez.
+  async function syncAuthState() {
+    const {data,error}=await db.auth.getSession();
+    if(error)throw error;
+    setConnection(true,"Supabase bağlı");
+    await updateAuth(data.session);
+  }
+  let authSyncTimer=null;
+  db.auth.onAuthStateChange((_event)=>{
+    if(authSyncTimer!==null)window.clearTimeout(authSyncTimer);
+    authSyncTimer=window.setTimeout(()=>{
+      authSyncTimer=null;
+      syncAuthState().catch(err=>{
+        console.error("NEXORA auth state sync:",err);
+        setConnection(false,"Oturum yenilenemedi");
+        toast("Oturum güncellenemedi. Tekrar giriş yapmayı dene.");
+      });
+    },0);
   });
   (async()=>{
     try {
-      const {data,error}=await db.auth.getSession();
-      if(error)throw error;
-      setConnection(true,"Supabase bağlı");
-      await updateAuth(data.session);
+      await syncAuthState();
     } catch(err) {
       setConnection(false,"Bağlantı hatası");
       $("home-community-list").innerHTML='<div class="loading">'+esc(err.message)+'</div>';
