@@ -128,7 +128,11 @@
     finally{button.disabled=false;}
   });
   $("room-back").addEventListener("click",()=>setView("communities"));
-  $("community-menu-toggle").addEventListener("click",()=>document.querySelector(".layout").classList.toggle("community-nav-open"));
+  const communityLayout=document.querySelector(".layout");
+  const setCommunityMenu=(open)=>{communityLayout.classList.toggle("community-nav-open",open);$("community-menu-toggle").setAttribute("aria-expanded",String(open));};
+  $("community-menu-toggle").addEventListener("click",e=>{e.stopPropagation();setCommunityMenu(!communityLayout.classList.contains("community-nav-open"));});
+  document.addEventListener("click",e=>{if(communityLayout.classList.contains("community-mode")&&communityLayout.classList.contains("community-nav-open")&&!e.target.closest(".sidebar")&&!e.target.closest("#community-menu-toggle"))setCommunityMenu(false);});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")setCommunityMenu(false);});
   $("sidebar-logout").addEventListener("click",async()=>{if(user&&confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}});
 
   let globalSearchType="all",globalSearchTimer=null;
