@@ -294,3 +294,33 @@ begin
  end if;
  return new;
 end; $$;
+
+
+-- Performance and policy consolidation pass.
+drop policy if exists "Users leave or owners remove community members" on public.community_members;
+drop policy if exists "Community managers remove members" on public.community_members;
+create policy "Community members leave or managers remove" on public.community_members for delete to authenticated
+using (
+ (user_id=(select auth.uid()) and role<>'owner')
+ or (
+   user_id<>(select auth.uid()) and role<>'owner'
+   and exists(select 1 from public.community_members actor
+     where actor.community_id=community_members.community_id and actor.user_id=(select auth.uid())
+     and (actor.role='owner' or (actor.role='admin' and community_members.role in ('moderator','member'))
+       or (actor.role='moderator' and community_members.role='member')))
+ )
+);
+drop policy if exists "Authors can undo own recent community messages" on public.community_messages;
+drop policy if exists "Community moderators clear messages" on public.community_messages;
+create policy "Authors undo recent messages or managers clear chat" on public.community_messages for delete to authenticated
+using ((author_id=(select auth.uid()) and created_at>=now()-interval '15 minutes') or private.is_community_manager(community_id));
+drop policy if exists "Users see their own memberships and owners see their community " on public.community_members;
+create index if not exists community_channels_created_by_idx on public.community_channels(created_by);
+create index if not exists community_join_requests_user_id_idx on public.community_join_requests(user_id);
+create index if not exists community_messages_author_id_idx on public.community_messages(author_id);
+create index if not exists community_messages_room_id_idx on public.community_messages(room_id);
+create index if not exists community_moderation_moderator_id_idx on public.community_moderation_actions(moderator_id);
+create index if not exists community_moderation_target_id_idx on public.community_moderation_actions(target_user_id);
+create index if not exists community_rooms_community_id_idx on public.community_rooms(community_id);
+create index if not exists community_rooms_created_by_idx on public.community_rooms(created_by);
+create index if not exists friendships_user_b_idx on public.friendships(user_b);
