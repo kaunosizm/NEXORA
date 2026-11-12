@@ -41,7 +41,7 @@
       <button class="nav-item active" data-view="feed"><span>⌂</span> Akış</button>
       <button class="nav-item" data-view="explore"><span>⌕</span> Keşfet</button>
       <button class="nav-item" data-view="communities"><span>◈</span> Topluluklar</button>
-      <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button><button class="nav-item hidden" id="admin-nav" data-view="admin"><span>♛</span> Kurucu Paneli</button>
+      <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button><button class="nav-item" data-view="settings"><span>⚙</span> Ayarlar</button><button class="nav-item hidden" id="admin-nav" data-view="admin"><span>♛</span> Kurucu Paneli</button>
       <div class="side-card"><div class="side-orb">✦</div><strong>Birlikte daha güçlüyüz.</strong><p>İlgi alanlarını paylaş, yeni insanlarla tanış.</p></div>
       <div class="side-foot">NEXORA <span>EARLY ACCESS</span><small>© 2026 NEXORA</small></div>
     </aside>
@@ -58,8 +58,8 @@
       </section>
       <section id="view-communities" class="view">
         <div class="page-heading"><div><div class="eyebrow">AYNI FREKANSTA BULUŞ</div><h1>Topluluklar<span class="gradient-text">.</span></h1><p>İlgini çeken topluluklara katıl veya kendi alanını oluştur.</p></div></div>
-        <form id="community-form" class="card community-create"><div><h2>Yeni bir alan oluştur</h2><p>İlgi alanını bir topluluğa dönüştür.</p></div><div class="form-grid"><input id="community-name" maxlength="48" placeholder="Topluluk adı" required><input id="community-slug" maxlength="56" placeholder="adres-adi" required><textarea id="community-description" maxlength="280" placeholder="Topluluğunu kısaca tanıt..."></textarea></div><button class="btn btn-primary" type="submit">Topluluk oluştur +</button></form>
-        <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><span id="community-count" class="muted"></span></div><div id="community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div>
+        <form id="community-form" class="card community-create"><div><h2>Yeni bir alan oluştur</h2><p>İlgi alanını bir topluluğa dönüştür.</p></div><div class="form-grid"><input id="community-name" maxlength="48" placeholder="Topluluk adı" required><input id="community-slug" maxlength="56" placeholder="adres-adi" required><textarea id="community-description" maxlength="280" placeholder="Topluluğunu kısaca tanıt..."></textarea><label>Görünürlük<select id="community-visibility"><option value="public">Herkese açık</option><option value="private">Gizli (Private)</option></select></label></div><button class="btn btn-primary" type="submit">Topluluk oluştur +</button></form>
+        <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><span id="community-count" class="muted"></span></div><div id="community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div><div id="community-requests" class="card community-requests hidden"><h2 class="section-title">Katılma istekleri</h2><div id="community-request-list"></div></div>
       </section>
       <section id="view-community-room" class="view">
         <div class="page-heading room-heading"><div><button class="btn btn-quiet" id="room-back">← Topluluklara dön</button><div class="eyebrow">TOPLULUK SOHBETİ</div><h1 id="room-title">Topluluk</h1><p id="room-description">Üyelerle paylaşım yap.</p></div></div>
@@ -82,11 +82,37 @@
         <form id="profile-form" class="card profile-card"><div class="profile-avatar-wrap"><div class="profile-avatar" id="profile-avatar">N</div><img id="profile-avatar-image" class="profile-avatar-image hidden" alt="Profil fotoğrafı"><label class="btn btn-quiet avatar-upload-label" for="avatar-file">Fotoğraf yükle</label><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><small>JPG, PNG veya WebP - En fazla 5 MB</small></div><div class="profile-fields"><label>Kullanıcı adı<input id="profile-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" required></label><label>Görünen ad<input id="profile-display" maxlength="40" required></label><label>Biyografi<textarea id="profile-bio" maxlength="160" placeholder="Kendinden biraz bahset..."></textarea></label><button class="btn btn-primary" type="submit">Profili kaydet</button></div></form>
         <div class="card profile-note"><span>✦</span><div><strong>Profilin senin dijital alanın.</strong><p>Kullanıcı adın ve biyografin herkese açık profilinde görüntülenir. E-posta adresin paylaşılmaz.</p></div></div>
       </section>
+      <section id="view-settings" class="view">
+        <div class="page-heading"><div><div class="eyebrow">HESAP GÜVENLİĞİ</div><h1>Ayarlar<span class="gradient-text">.</span></h1><p>Hesabını ve giriş güvenliğini yönet.</p></div></div>
+        <form id="password-change-form" class="card settings-card">
+          <div><div class="eyebrow">ŞİFRE GÜVENLİĞİ</div><h2>Şifre değiştir</h2><p>Değişiklik için mevcut şifreni doğrulaman gerekir.</p></div>
+          <label>Mevcut şifre<input id="current-password" type="password" autocomplete="current-password" required></label>
+          <label>Yeni şifre<input id="new-password" type="password" minlength="8" autocomplete="new-password" required></label>
+          <label>Yeni şifreyi tekrar gir<input id="confirm-password" type="password" minlength="8" autocomplete="new-password" required></label>
+          <button class="btn btn-primary" type="submit">Şifreyi güncelle</button>
+          <div id="password-change-message" class="form-message" role="status"></div>
+        </form>
+        <div class="card settings-card">
+          <div class="eyebrow">EK HESAP KORUMASI</div><h2>İki faktörlü doğrulama</h2>
+          <p>Authenticator uygulamasındaki tek kullanımlık kodla hesabına ek koruma ekle.</p>
+          <div id="mfa-status" class="mfa-status">Durum kontrol ediliyor...</div>
+          <button id="mfa-start" class="btn btn-primary" type="button">2FA kurulumunu başlat</button>
+          <div id="mfa-setup" class="mfa-setup hidden">
+            <p>QR kodunu authenticator uygulamanla tara. Tarayamıyorsan aşağıdaki anahtarı uygulamaya elle ekleyebilirsin.</p>
+            <img id="mfa-qr" alt="İki faktörlü doğrulama QR kodu">
+            <p class="mfa-secret-label">Kurulum anahtarı</p><code id="mfa-secret"></code>
+            <form id="mfa-verify-form"><label>Uygulamadaki 6 haneli kod<input id="mfa-setup-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="btn btn-primary" type="submit">Doğrula ve etkinleştir</button></form>
+          </div>
+          <button id="mfa-disable" class="btn btn-quiet hidden" type="button">2FA'yı devre dışı bırak</button>
+          <p class="settings-help">Kurulum tamamlandığında sonraki girişlerinde bu kod istenir. Kurulum anahtarını kimseyle paylaşma.</p>
+        </div>
+      </section>
       <section id="view-admin" class="view"><div class="page-heading"><div><div class="eyebrow">NEXORA MANAGEMENT</div><h1>Kurucu Paneli<span class="gradient-text">.</span></h1><p>Platformun genel durumunu buradan takip edebilirsin.</p></div></div><div class="admin-welcome card">♛ <div><strong>Kurucu erişimi doğrulandı</strong><p>Bu panel yalnızca kurucu hesabına gösterilir.</p></div></div><div class="admin-stats" id="admin-stats"></div><div class="card admin-members"><div class="section-row"><h2 class="section-title">Son katılan üyeler</h2><span class="muted">Kurucu görünümü</span></div><div id="admin-member-list" class="admin-member-list"><div class="loading">Yükleniyor...</div></div></div></section>
     </main>
     <aside class="rightbar"><div class="right-card"><div class="right-title">NEXORA NOTU <span>✦</span></div><h3>Her topluluk<br>bir fikirle başlar.</h3><p>İlk gönderini paylaşarak NEXORA'yı birlikte büyütelim.</p></div><div class="right-card mini-card"><div class="right-title">PLATFORM</div><div class="stat-line"><span>Durum</span><strong class="online">● Aktif</strong></div><div class="stat-line"><span>Topluluklar</span><strong id="side-community-count">—</strong></div><div class="stat-line"><span>Paylaşımlar</span><strong id="side-post-count">—</strong></div></div><div class="right-footer">Güvenli ve saygılı bir topluluk<br>oluşturmaya katkı sağla.</div></aside>
   </div>
   <dialog id="auth-dialog" class="auth-dialog"><form id="auth-form" class="auth-box"><button type="button" class="dialog-close" id="auth-close">×</button><div class="brand auth-brand"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></div><div class="eyebrow" id="auth-eyebrow">TOPLULUĞA KATIL</div><h2 id="auth-title">Hesabını oluştur.</h2><p id="auth-subtitle">NEXORA'da kendi alanını keşfet.</p><label id="username-wrap">Kullanıcı adı<input id="auth-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" placeholder="ornek_kullanici"></label><label>E-posta<input id="auth-email" type="email" autocomplete="email" required placeholder="ornek@eposta.com"></label><label>Şifre<input id="auth-password" type="password" minlength="8" autocomplete="current-password" required placeholder="En az 8 karakter"></label><button id="auth-submit" class="btn btn-primary btn-wide" type="submit">Hesap oluştur</button><div id="auth-message" class="form-message" role="status"></div><p class="auth-switch"><span id="auth-switch-copy">Zaten hesabın var mı?</span> <button type="button" id="auth-switch">Giriş yap</button></p></form></dialog>
+  <dialog id="mfa-login-dialog" class="auth-dialog mfa-login-dialog"><form id="mfa-login-form" class="auth-box"><div class="brand auth-brand"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></div><div class="eyebrow">EK GÜVENLİK KONTROLÜ</div><h2>Doğrulama kodu</h2><p>Authenticator uygulamandaki 6 haneli kodu girerek girişini tamamla.</p><label>6 haneli kod<input id="mfa-login-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label><button class="btn btn-primary btn-wide" type="submit">Doğrula ve giriş yap</button><div id="mfa-login-message" class="form-message" role="status"></div></form></dialog>
   <div id="toast" class="toast" role="status"></div>
 </body>
 </html>
