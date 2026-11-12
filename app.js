@@ -16,7 +16,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup";
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [];
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -51,6 +51,7 @@
   $("auth-close").addEventListener("click", () => $("auth-dialog").close());
   $("auth-switch").addEventListener("click", () => showAuth(authMode === "signup" ? "login" : "signup"));
   $("refresh-feed").addEventListener("click", loadFeed);
+  $("room-back").addEventListener("click",()=>setView("communities"));
   $("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const email = $("auth-email").value.trim(); const password = $("auth-password").value;
     const button = $("auth-submit"); button.disabled = true; $("auth-message").textContent = "İşleniyor...";
@@ -79,13 +80,6 @@
     if (error) return toast(error.message);
     await loadProfile(); toast("Profilin kaydedildi.");
   });
-  $("publish-post").addEventListener("click", async () => {
-    if (!requireUser()) return;
-    const content = $("post-content").value.trim(); if (!content) return toast("Önce bir şeyler yaz.");
-    const {error} = await db.from("posts").insert({author_id:user.id,content});
-    if (error) return toast(error.message);
-    $("post-content").value = ""; toast("Paylaşımın yayınlandı."); await loadFeed();
-  });
   $("community-form").addEventListener("submit", async (e) => {
     e.preventDefault(); if (!requireUser()) return;
     const name = $("community-name").value.trim();
@@ -113,10 +107,10 @@
   function authorLabel(p) { const founder=p.id==="242245a8-acf0-489a-9ba4-e9e4c1593f19"; return `<span class="${founder?"founder-name":""}">${esc(p.display_name||p.username||"NEXORA üyesi")}</span>${founder?' <span class="founder-badge" title="NEXORA Kurucusu">♛ KURUCU</span>':""}`; }
   function postMarkup(post) {
     const p = post.profiles || {}; const comments = post.comments || []; const liked = user && (post.post_likes || []).some(x => x.user_id === user.id);
-    return `<article class="card post-card" data-post="${post.id}"><div class="post-head"><div class="post-avatar">${esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())}</div><div><div class="post-author">${authorLabel(p)}</div><div class="post-meta">@${esc(p.username||"uye")} · ${esc(when(post.created_at))}</div></div></div><div class="post-content">${esc(post.content)}</div><div class="post-actions"><button class="action-btn ${liked?"liked":""}" data-like>${liked?"♥":"♡"} ${(post.post_likes||[]).length} Beğeni</button><span class="action-btn">▢ ${comments.length} Yorum</span></div><div class="comment-list">${comments.map(c=>`<div class="comment"><strong>@${esc(c.profiles?.username||"uye")}</strong>${esc(c.content)}</div>`).join("")}</div><form class="comment-form"><input maxlength="500" placeholder="Yorumunu yaz..." aria-label="Yorum"><button type="submit">Gönder</button></form></article>`;
+    return `<article class="card post-card" data-post="${post.id}"><div class="post-head">${p.avatar_url?`<img class="post-avatar post-avatar-image" src="${esc(p.avatar_url)}" alt="">`:`<div class="post-avatar">${esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())}</div>`}<div><div class="post-author">${authorLabel(p)}</div><div class="post-meta">@${esc(p.username||"uye")} · ${esc(post.communities?.name||"Topluluk")} · ${esc(when(post.created_at))}</div></div></div><div class="post-content">${esc(post.content)}</div><div class="post-actions"><button class="action-btn ${liked?"liked":""}" data-like>${liked?"♥":"♡"} ${(post.post_likes||[]).length} Beğeni</button><span class="action-btn">▢ ${comments.length} Yorum</span></div><div class="comment-list">${comments.map(c=>`<div class="comment"><strong>@${esc(c.profiles?.username||"uye")}</strong>${esc(c.content)}</div>`).join("")}</div><form class="comment-form"><input maxlength="500" placeholder="Yorumunu yaz..." aria-label="Yorum"><button type="submit">Gönder</button></form></article>`;
   }
   async function fetchPosts() {
-    const {data,error} = await db.from("posts").select("id,content,created_at,author_id,profiles!posts_author_id_fkey(id,username,display_name),post_likes(user_id),comments(id,content,created_at,profiles!comments_author_id_fkey(id,username,display_name))").order("created_at",{ascending:false}).limit(40);
+    const {data,error} = await db.from("posts").select("id,content,created_at,author_id,community_id,profiles!posts_author_id_fkey(id,username,display_name,avatar_url),communities!posts_community_id_fkey(name),post_likes(user_id),comments(id,content,created_at,profiles!comments_author_id_fkey(id,username,display_name))").not("community_id","is",null).order("created_at",{ascending:false}).limit(40);
     if (error) throw error; return data || [];
   }
   function bindPostActions(root) {
@@ -155,7 +149,8 @@
     if (!data?.length) { $("community-list").innerHTML = '<div class="card loading">Henüz topluluk yok. İlk topluluğu sen oluştur!</div>'; return; }
     let joined = new Set();
     if (user) { const {data:members} = await db.from("community_members").select("community_id").eq("user_id",user.id); joined = new Set((members||[]).map(m=>m.community_id)); }
-    $("community-list").innerHTML = data.map((c,i)=>`<article class="card community-card"><div class="community-symbol">${["✦","◈","⌘","✧"][i%4]}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><button class="btn ${joined.has(c.id)?"btn-quiet":"btn-primary"}" data-join="${c.id}" ${joined.has(c.id)?"disabled":""}>${joined.has(c.id)?"Katıldın ✓":"Topluluğa katıl +"}</button></article>`).join("");
+    $("community-list").innerHTML = data.map((c,i)=>`<article class="card community-card"><div class="community-symbol">${["✦","◈","⌘","✧"][i%4]}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${joined.has(c.id)?`<button class="btn btn-primary" data-open-community="${c.id}">Topluluğu aç ↗</button>`:`<button class="btn btn-quiet" data-join="${c.id}">Topluluğa katıl +</button>`}</div></article>`).join("");
+    $("community-list").querySelectorAll("[data-open-community]").forEach(btn=>btn.addEventListener("click",()=>openCommunity(data.find(c=>c.id===btn.dataset.openCommunity))));
     $("community-list").querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return; const {error:joinError}=await db.from("community_members").insert({community_id:btn.dataset.join,user_id:user.id,role:"member"});
       if(joinError && !joinError.message.includes("duplicate"))return toast(joinError.message);
@@ -184,6 +179,64 @@
     const url=db.storage.from("avatars").getPublicUrl(path).data.publicUrl;
     const saved=await db.from("profiles").update({avatar_url:url}).eq("id",user.id); if(saved.error)return toast(saved.error.message);
     await loadProfile(); toast("Profil fotoğrafın güncellendi."); e.target.value="";
+  });
+
+  async function openCommunity(community) {
+    if (!community || !requireUser()) return;
+    const {data:member,error:memberError}=await db.from("community_members").select("community_id").eq("community_id",community.id).eq("user_id",user.id).maybeSingle();
+    if(memberError||!member) return toast("Bu topluluğun üyesi olmalısın.");
+    activeCommunity=community;
+    $("room-title").textContent=community.name;
+    $("room-description").textContent=community.description||"Topluluk üyeleriyle mesajlaş.";
+    setView("community-room");
+    await loadRoomMessages();
+    if(roomChannel) await db.removeChannel(roomChannel);
+    roomChannel=db.channel("community-room-"+community.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"community_messages",filter:"community_id=eq."+community.id},()=>loadRoomMessages()).subscribe();
+  }
+  async function loadRoomMessages() {
+    if(!activeCommunity)return;
+    const box=$("room-messages"); box.innerHTML='<div class="loading">Mesajlar yükleniyor...</div>';
+    const {data,error}=await db.from("community_messages").select("id,author_id,message_type,content,media_path,created_at,profiles!community_messages_author_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("created_at",{ascending:true}).limit(150);
+    if(error){box.innerHTML='<div class="loading">'+esc(error.message)+'</div>';return;}
+    if(!data?.length){box.innerHTML='<div class="room-empty">Henüz mesaj yok. İlk mesajı sen gönder!</div>';return;}
+    const rendered=await Promise.all(data.map(async m=>{
+      let media="";
+      if(m.media_path){const signed=await db.storage.from("community-media").createSignedUrl(m.media_path,3600);if(!signed.error&&signed.data?.signedUrl){media=m.message_type==="image"?'<img class="room-image" src="'+esc(signed.data.signedUrl)+'" alt="Paylaşılan fotoğraf" loading="lazy">':'<audio class="room-audio" controls preload="none" src="'+esc(signed.data.signedUrl)+'"></audio>';}}
+      const p=m.profiles||{};const founder=m.author_id===FOUNDER_UID;
+      return '<article class="room-message">'+(p.avatar_url?'<img class="room-avatar" src="'+esc(p.avatar_url)+'" alt="">':'<div class="room-avatar">'+esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())+'</div>')+'<div class="room-message-body"><div class="room-message-head"><strong class="'+(founder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong> '+(founder?'<span class="founder-badge">♛ KURUCU</span>':'')+' <small>@'+esc(p.username||"uye")+' · '+esc(when(m.created_at))+'</small></div>'+(m.content?'<p>'+esc(m.content)+'</p>':'')+media+'</div></article>';
+    }));
+    box.innerHTML=rendered.join("");box.scrollTop=box.scrollHeight;
+  }
+  async function sendRoomMessage(fileOverride=null) {
+    if(!activeCommunity||!requireUser())return;
+    const content=$("room-message").value.trim();const file=fileOverride||$("room-file").files?.[0];
+    if(!content&&!file)return toast("Mesaj yaz veya fotoğraf/ses ekle.");
+    let message_type="text",media_path=null;
+    if(file){
+      if(file.type.startsWith("image/"))message_type="image";else if(file.type.startsWith("audio/"))message_type="audio";else return toast("Yalnızca fotoğraf veya ses dosyası gönderebilirsin.");
+      if(file.size>10*1024*1024)return toast("Dosya en fazla 10 MB olabilir.");
+      const safeName=file.name?file.name.replace(/[^a-zA-Z0-9._-]/g,"_"):"voice-note.webm";
+      media_path=activeCommunity.id+"/"+user.id+"/"+Date.now()+"-"+safeName;
+      const upload=await db.storage.from("community-media").upload(media_path,file,{cacheControl:"3600",upsert:false,contentType:file.type});
+      if(upload.error)return toast(upload.error.message);
+    }
+    const {error}=await db.from("community_messages").insert({community_id:activeCommunity.id,author_id:user.id,message_type,content,media_path});
+    if(error)return toast(error.message);
+    $("room-message").value="";$("room-file").value="";if(fileOverride)toast("Sesli mesaj gönderildi.");await loadRoomMessages();
+  }
+  $("room-form").addEventListener("submit",async e=>{e.preventDefault();await sendRoomMessage();});
+  $("room-file").addEventListener("change",e=>{if(e.target.files?.[0])toast("Dosya hazır. Göndermek için Gönder'e bas.");});
+  $("record-audio").addEventListener("click",async()=>{
+    if(!requireUser())return;
+    if(mediaRecorder?.state==="recording"){mediaRecorder.stop();$("record-audio").textContent="● Ses kaydet";$("record-status").textContent="Ses hazırlanıyor...";return;}
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return toast("Bu tarayıcı ses kaydını desteklemiyor.");
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      mediaRecorder=new MediaRecorder(stream);recordingChunks=[];
+      mediaRecorder.ondataavailable=e=>{if(e.data.size)recordingChunks.push(e.data);};
+      mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(recordingChunks,{type:mediaRecorder.mimeType||"audio/webm"});const ext=blob.type.includes("ogg")?"ogg":blob.type.includes("mp4")?"m4a":"webm";const voice=new File([blob],"voice-note-"+Date.now()+"."+ext,{type:blob.type});$("record-status").textContent="";await sendRoomMessage(voice);};
+      mediaRecorder.start();$("record-audio").textContent="■ Kaydı bitir";$("record-status").textContent="Ses kaydediliyor...";
+    }catch(err){toast("Mikrofon izni alınamadı: "+err.message);}
   });
   async function loadAdmin(){
     if(!user||user.id!==FOUNDER_UID)return;
