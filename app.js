@@ -217,7 +217,7 @@
       if(file.size>10*1024*1024)return toast("Dosya en fazla 10 MB olabilir.");
       const safeName=file.name?file.name.replace(/[^a-zA-Z0-9._-]/g,"_"):"voice-note.webm";
       media_path=activeCommunity.id+"/"+user.id+"/"+Date.now()+"-"+safeName;
-      const upload=await db.storage.from("community-media").upload(media_path,file,{cacheControl:"3600",upsert:false,contentType:file.type});
+      const upload=await db.storage.from("community-media").upload(media_path,file,{cacheControl:"3600",upsert:false,contentType:file.type.split(";")[0]});
       if(upload.error)return toast(upload.error.message);
     }
     const {error}=await db.from("community_messages").insert({community_id:activeCommunity.id,author_id:user.id,message_type,content,media_path});
@@ -240,9 +240,11 @@
   });
   async function loadAdmin(){
     if(!user||user.id!==FOUNDER_UID)return;
-    const items=[["Üyeler","profiles"],["Topluluklar","communities"],["Paylaşımlar","posts"]];
+    const items=[["Üyeler","profiles"],["Topluluklar","communities"],["Topluluk mesajları","community_messages"],["Paylaşımlar","posts"]];
     const stats=await Promise.all(items.map(async x=>{const r=await db.from(x[1]).select("*",{count:"exact",head:true});return {label:x[0],count:r.count,error:r.error};}));
     $("admin-stats").innerHTML=stats.map(x=>'<div class="card admin-stat"><span>'+esc(x.label)+'</span><strong>'+(x.error?"—":x.count)+'</strong></div>').join("");
+    const members=await db.from("profiles").select("id,username,display_name,created_at").order("created_at",{ascending:false}).limit(12);
+    $("admin-member-list").innerHTML=members.error?'<div class="loading">'+esc(members.error.message)+'</div>':(members.data||[]).map(m=>'<div class="admin-member"><div><strong>'+esc(m.display_name||m.username)+'</strong> '+(m.id===FOUNDER_UID?'<span class="founder-badge">♛ KURUCU</span>':'')+'<small>@'+esc(m.username)+'</small></div><time>'+esc(when(m.created_at))+'</time></div>').join("")||'<div class="loading">Henüz üye yok.</div>';
   }
   db.auth.onAuthStateChange((_event,session)=>{ updateAuth(session); });
   (async()=>{
