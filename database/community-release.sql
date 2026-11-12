@@ -324,3 +324,14 @@ create index if not exists community_moderation_target_id_idx on public.communit
 create index if not exists community_rooms_community_id_idx on public.community_rooms(community_id);
 create index if not exists community_rooms_created_by_idx on public.community_rooms(created_by);
 create index if not exists friendships_user_b_idx on public.friendships(user_b);
+
+
+-- Pin messages for community announcements and important information.
+alter table public.community_messages add column if not exists is_pinned boolean not null default false;
+alter table public.community_messages add column if not exists pinned_by uuid references public.profiles(id) on delete set null;
+create index if not exists community_messages_room_pinned_created_idx on public.community_messages(room_id,is_pinned desc,created_at desc);
+drop policy if exists "Community managers pin messages" on public.community_messages;
+create policy "Community managers pin messages" on public.community_messages for update to authenticated
+using (private.is_community_manager(community_id))
+with check (private.is_community_manager(community_id));
+grant update(is_pinned,pinned_by) on public.community_messages to authenticated;
