@@ -299,6 +299,7 @@ end; $$;
 -- Performance and policy consolidation pass.
 drop policy if exists "Users leave or owners remove community members" on public.community_members;
 drop policy if exists "Community managers remove members" on public.community_members;
+drop policy if exists "Community members leave or managers remove" on public.community_members;
 create policy "Community members leave or managers remove" on public.community_members for delete to authenticated
 using (
  (user_id=(select auth.uid()) and role<>'owner')
@@ -312,6 +313,7 @@ using (
 );
 drop policy if exists "Authors can undo own recent community messages" on public.community_messages;
 drop policy if exists "Community moderators clear messages" on public.community_messages;
+drop policy if exists "Authors undo recent messages or managers clear chat" on public.community_messages;
 create policy "Authors undo recent messages or managers clear chat" on public.community_messages for delete to authenticated
 using ((author_id=(select auth.uid()) and created_at>=now()-interval '15 minutes') or private.is_community_manager(community_id));
 drop policy if exists "Users see their own memberships and owners see their community " on public.community_members;
