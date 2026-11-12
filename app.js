@@ -15,6 +15,7 @@
     return;
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
+  const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
   let user = null, profile = null, authMode = "signup";
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
@@ -39,6 +40,7 @@
     if (name === "communities") loadCommunities();
     if (name === "profile") loadProfile();
     if (name === "explore") loadExplore();
+    if (name === "admin") loadAdmin();
     window.scrollTo({top:0,behavior:"smooth"});
   };
   document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
@@ -97,13 +99,16 @@
   });
   async function loadProfile() {
     if (!user) { $("profile-username").value=""; $("profile-display").value=""; $("profile-bio").value=""; return; }
-    const {data,error} = await db.from("profiles").select("username,display_name,bio").eq("id",user.id).maybeSingle();
+    const {data,error} = await db.from("profiles").select("username,display_name,bio,avatar_url").eq("id",user.id).maybeSingle();
     if (error) return toast(error.message);
     profile = data; if (!data) return;
     $("profile-username").value = data.username || "";
     $("profile-display").value = data.display_name || "";
     $("profile-bio").value = data.bio || "";
     $("profile-avatar").textContent = (data.display_name || data.username || "N").slice(0,1).toUpperCase();
+    $("profile-avatar-image").classList.toggle("hidden",!data.avatar_url);
+    $("profile-avatar").classList.toggle("hidden",!!data.avatar_url);
+    if(data.avatar_url) $("profile-avatar-image").src=data.avatar_url;
   }
   function postMarkup(post) {
     const p = post.profiles || {}; const comments = post.comments || []; const liked = user && (post.post_likes || []).some(x => x.user_id === user.id);
@@ -162,12 +167,28 @@
     document.querySelector(".layout").classList.toggle("hidden",!user);
     $("auth-open").classList.add("hidden"); $("user-chip").classList.toggle("hidden",!user);
     if (user) {
-      const {data} = await db.from("profiles").select("username,display_name").eq("id",user.id).maybeSingle();
-      profile = data; $("user-chip").textContent = "@"+(data?.username || "üye");
+      const {data} = await db.from("profiles").select("id,username,display_name").eq("id",user.id).maybeSingle();
+      profile = data; $("user-chip").innerHTML = data?.id===FOUNDER_UID ? '<span class="founder-name">@'+esc(data.username||"kurucu")+'</span> <span class="founder-badge">♛</span>' : "@"+esc(data?.username || "üye");
+      $("admin-nav").classList.toggle("hidden",user.id!==FOUNDER_UID);
       $("user-chip").title = "Çıkış yap"; $("user-chip").style.cursor="pointer";
       $("user-chip").onclick = async()=>{if(confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}};
-    } else { profile=null; $("user-chip").onclick=null; }
+    } else { profile=null; $("user-chip").onclick=null; $("admin-nav").classList.add("hidden"); }
     await Promise.all([loadFeed(),loadCommunities()]);
+  }
+  $("avatar-file").addEventListener("change", async (e)=>{
+    if(!requireUser())return; const file=e.target.files?.[0]; if(!file)return;
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024){e.target.value="";return toast("JPG, PNG veya WebP seç; dosya 5 MB sınırı var.");}
+    const path=user.id+"/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const up=await db.storage.from("avatars").upload(path,file,{cacheControl:"3600",upsert:false}); if(up.error)return toast(up.error.message);
+    const url=db.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    const saved=await db.from("profiles").update({avatar_url:url}).eq("id",user.id); if(saved.error)return toast(saved.error.message);
+    await loadProfile(); toast("Profil fotoğrafın güncellendi."); e.target.value="";
+  });
+  async function loadAdmin(){
+    if(!user||user.id!==FOUNDER_UID)return;
+    const items=[["Üyeler","profiles"],["Topluluklar","communities"],["Paylaşımlar","posts"]];
+    const stats=await Promise.all(items.map(async x=>{const r=await db.from(x[1]).select("*",{count:"exact",head:true});return {label:x[0],count:r.count,error:r.error};}));
+    $("admin-stats").innerHTML=stats.map(x=>'<div class="card admin-stat"><span>'+esc(x.label)+'</span><strong>'+(x.error?"—":x.count)+'</strong></div>').join("");
   }
   db.auth.onAuthStateChange((_event,session)=>{ updateAuth(session); });
   (async()=>{
