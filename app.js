@@ -443,7 +443,7 @@
     if(!activeCommunity)return;
     const [channelsResult,membersResult]=await Promise.all([
       db.from("community_channels").select("id,community_id,name,created_by,sort_order,created_at").eq("community_id",activeCommunity.id).order("sort_order").order("created_at"),
-      db.from("community_members").select("user_id,role,joined_at,profiles!community_members_user_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("joined_at")
+      db.from("community_members").select("user_id,role,role_name,role_color,muted_until,joined_at,profiles!community_members_user_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("joined_at")
     ]);
     communityChannelError=channelsResult.error?.message||null;
     if(channelsResult.error){$("room-channel-list").innerHTML='<p class="empty-note">Kanallar alınamadı: '+esc(channelsResult.error.message)+'</p>';communityChannels=[];}else communityChannels=channelsResult.data||[];
@@ -457,9 +457,11 @@
     $("room-member-count").textContent=String(communityMembers.length);
     if(!membersResult.error)$("room-member-list").innerHTML=communityMembers.length?communityMembers.map(m=>{
       const p=m.profiles||{},isCommunityFounder=m.user_id===activeCommunity.created_by,isPlatformFounder=m.user_id===FOUNDER_UID;
-      const label=isCommunityFounder?"KURUCU":m.role==="moderator"?"MODERATÖR":isPlatformFounder?"NEXORA KURUCU":"ÜYE";
-      return '<div class="room-member"><span class="room-member-avatar">'+(p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase()))+'</span><span class="room-member-name"><strong class="'+(isPlatformFounder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong><small>@'+esc(p.username||"uye")+'</small></span><span class="room-member-role '+(isCommunityFounder||isPlatformFounder?'founder-name':'')+'">'+label+'</span></div>';
+      const label=isCommunityFounder?"KURUCU":m.role_name||({admin:"YÖNETİCİ",moderator:"MODERATÖR",member:"ÜYE"}[m.role]||"ÜYE");
+      const canAct=!isCommunityFounder&&m.user_id!==user?.id&&(communityRole==="owner"||communityRole==="admin"||(communityRole==="moderator"&&m.role==="member"));
+      return '<div class="room-member"><button type="button" class="room-member-profile" data-profile-view="'+m.user_id+'"><span class="room-member-avatar">'+(p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase()))+'</span><span class="room-member-name"><strong class="'+(isPlatformFounder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong><small>@'+esc(p.username||"uye")+'</small></span></button><span class="room-member-role '+(isCommunityFounder||isPlatformFounder?'founder-name':'')+'" '+(m.role_color?'style="color:'+esc(m.role_color)+'"':'')+'>'+esc(label)+'</span>'+(canAct?'<button class="room-member-manage" type="button" data-manage-member="'+m.user_id+'" data-member-role="'+esc(m.role)+'">•••</button>':'')+'</div>';
     }).join(""):'<p class="empty-note">Henüz üye yok.</p>';
+    $("room-member-list").querySelectorAll("[data-manage-member]").forEach(btn=>btn.addEventListener("click",()=>manageCommunityMember(btn.dataset.manageMember,btn.dataset.memberRole)));
     const desiredChannel=communityChannels.find(c=>c.id===preferredChannelId)||communityChannels.find(c=>c.id===activeChannel?.id)||communityChannels[0]||null;
     activeChannel=desiredChannel;
     const desiredRooms=communityRooms.filter(r=>r.channel_id===activeChannel?.id);
