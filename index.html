@@ -18,7 +18,7 @@
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
   <header class="topbar">
     <a class="brand" href="#" aria-label="NEXORA ana sayfa"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></a>
-    <div class="top-actions"><span id="connection-state" class="connection hidden"><i></i> Bağlanıyor</span><button id="auth-open" class="btn btn-primary" style="display:none">Giriş yap</button><div id="user-chip" class="user-chip hidden"></div></div>
+    <div class="top-search"><button id="global-search-open" class="global-search-trigger" type="button" aria-label="Ara"><span>⌕</span><span>Profil veya topluluk ara...</span><kbd>⌘ K</kbd></button></div><div class="top-actions"><span id="connection-state" class="connection hidden"><i></i> Bağlanıyor</span><button id="auth-open" class="btn btn-primary" style="display:none">Giriş yap</button></div>
   </header>
   <section id="welcome-screen" class="welcome-screen">
     <div class="welcome-glow"></div>
@@ -44,7 +44,7 @@
       <button class="nav-item" data-view="messages"><span>✉</span> Mesajlar</button>
       <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button><button class="nav-item" data-view="settings"><span>⚙</span> Hesap</button><button class="nav-item hidden" id="admin-nav" data-view="admin"><span>♛</span> Kurucu Paneli</button>
       <div class="side-card"><div class="side-orb">✦</div><strong>Birlikte daha güçlüyüz.</strong><p>İlgi alanlarını paylaş, yeni insanlarla tanış.</p></div>
-      <div class="side-foot">NEXORA <span>EARLY ACCESS</span><small>© 2026 NEXORA</small></div>
+      <div class="sidebar-profile" id="sidebar-profile"><div class="sidebar-profile-avatar" id="sidebar-profile-avatar">N</div><div class="sidebar-profile-copy"><strong id="sidebar-profile-name">Profil</strong><small id="sidebar-profile-username">@kullanıcı</small></div><button id="sidebar-logout" type="button" title="Çıkış yap">↗</button></div><div class="side-foot">NEXORA <span>EARLY ACCESS</span><small>© 2026 NEXORA</small></div>
     </aside>
     <main class="main">
       <section id="view-home" class="view active">
@@ -59,13 +59,13 @@
         <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><span id="community-count" class="muted"></span></div><div id="community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div><div id="community-requests" class="card community-requests hidden"><h2 class="section-title">Katılma istekleri</h2><div id="community-request-list"></div></div>
       </section>
       <section id="view-community-room" class="view">
-        <div class="page-heading room-heading"><div><button class="btn btn-quiet" id="room-back">← Topluluklara dön</button><div class="eyebrow">TOPLULUK ALANI</div><h1 id="room-title">Topluluk</h1><p id="room-description">Topluluk kanalları, odaları ve üyeleri.</p></div></div>
+        <div class="page-heading room-heading"><div class="room-heading-top"><div><div class="eyebrow">TOPLULUK ALANI</div><h1 id="room-title">Topluluk</h1><p id="room-description">Topluluk kanalları, odaları ve üyeleri.</p></div><div class="room-heading-actions"><button class="btn btn-quiet" id="community-menu-toggle" type="button">☰ Menü</button><button class="btn btn-quiet" id="room-back">← Topluluklara dön</button></div></div></div>
         <div class="card room-shell room-workspace">
           <aside class="room-sidebar">
-            <div class="room-sidebar-section">
+            <div class="room-sidebar-section room-channels-section">
               <div class="room-sidebar-heading"><span>KANALLAR</span><button id="channel-create-toggle" class="room-add-inline hidden" type="button" title="Kanal oluştur">+</button></div>
               <form id="channel-create-form" class="room-inline-form hidden"><input id="channel-name" maxlength="32" placeholder="Yeni kanal adı" required><button class="btn btn-primary" type="submit">Ekle</button></form>
-              <div id="room-channel-list"><div class="loading">Kanallar yükleniyor...</div></div>
+              <div id="room-channel-list"><div class="empty-note">Kanallar henüz yüklenmedi.</div></div>
               <button id="room-create-toggle" class="btn btn-quiet room-create-trigger hidden" type="button">+ Yeni oda oluştur</button>
               <form id="room-create-form" class="room-inline-form hidden">
                 <select id="room-create-channel" required aria-label="Kanal seç"></select>
@@ -74,7 +74,7 @@
                 <button class="btn btn-primary" type="submit">Oda oluştur</button>
               </form>
             </div>
-            <div class="room-sidebar-section room-members-section"><div class="room-sidebar-heading"><span>ÜYELER</span><span id="room-member-count" class="muted">0</span></div><div id="room-member-list"><div class="loading">Üyeler yükleniyor...</div></div></div>
+            <div class="room-sidebar-account" id="room-sidebar-account"><div class="sidebar-profile-avatar" id="room-profile-avatar">N</div><div class="sidebar-profile-copy"><strong id="room-profile-name">Profil</strong><small id="room-profile-username">@kullanıcı</small></div></div>
           </aside>
           <section class="room-main">
             <div class="room-active-heading"><div><div class="eyebrow" id="room-channel-name">GENEL</div><h2 id="active-room-title"># sohbet</h2><p id="active-room-topic">Topluluğun genel sohbet odası</p></div></div>
@@ -89,6 +89,7 @@
               </div>
             </form>
           </section>
+          <aside class="room-members-sidebar"><div class="room-sidebar-heading"><span>ÜYELER</span><span id="room-member-count" class="muted">0</span></div><div id="room-member-list" class="room-member-list"><div class="empty-note">Üye listesi henüz yüklenmedi.</div></div></aside>
         </div>
       </section>
       <section id="view-friends" class="view">
@@ -144,6 +145,7 @@
     </main>
     <aside class="rightbar"><div class="right-card"><div class="right-title">NEXORA NOTU <span>✦</span></div><h3>Her topluluk<br>bir fikirle başlar.</h3><p>İlgi alanını keşfet, topluluğunu bul ve arkadaşlarınla bağlantı kur.</p></div><div class="right-card mini-card"><div class="right-title">PLATFORM</div><div class="stat-line"><span>Durum</span><strong class="online">● Aktif</strong></div><div class="stat-line"><span>Topluluklar</span><strong id="side-community-count">—</strong></div></div><div class="right-footer">Güvenli ve saygılı bir topluluk<br>oluşturmaya katkı sağla.</div></aside>
   </div>
+  <dialog id="global-search-dialog" class="auth-dialog global-search-dialog"><div class="global-search-box"><button type="button" class="dialog-close" id="global-search-close">×</button><div class="eyebrow">NEXORA KEŞİF</div><h2>Ne arıyorsun?</h2><div class="global-search-tabs"><button type="button" class="active" data-search-type="all">Tümü</button><button type="button" data-search-type="profiles">Profiller</button><button type="button" data-search-type="communities">Topluluklar</button></div><input id="global-search-input" type="search" maxlength="60" placeholder="İsim, kullanıcı adı veya topluluk..."><div id="global-search-results" class="global-search-results"><p class="empty-note">Aramaya başlamak için en az 2 karakter yaz.</p></div></div></dialog>
   <dialog id="auth-dialog" class="auth-dialog"><form id="auth-form" class="auth-box"><button type="button" class="dialog-close" id="auth-close">×</button><div class="brand auth-brand"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></div><div class="eyebrow" id="auth-eyebrow">TOPLULUĞA KATIL</div><h2 id="auth-title">Hesabını oluştur.</h2><p id="auth-subtitle">NEXORA'da kendi alanını keşfet.</p><label id="username-wrap">Kullanıcı adı<input id="auth-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" placeholder="ornek_kullanici"></label><label>E-posta<input id="auth-email" type="email" autocomplete="email" required placeholder="ornek@eposta.com"></label><label>Şifre<input id="auth-password" type="password" minlength="8" autocomplete="current-password" required placeholder="En az 8 karakter"></label><button id="auth-submit" class="btn btn-primary btn-wide" type="submit">Hesap oluştur</button><div id="auth-message" class="form-message" role="status"></div><p class="auth-switch"><span id="auth-switch-copy">Zaten hesabın var mı?</span> <button type="button" id="auth-switch">Giriş yap</button></p></form></dialog>
   <dialog id="mfa-login-dialog" class="auth-dialog mfa-login-dialog"><form id="mfa-login-form" class="auth-box"><div class="brand auth-brand"><span class="brand-mark">N</span><span>NEXORA<span class="brand-dot">.</span></span></div><div class="eyebrow">EK GÜVENLİK KONTROLÜ</div><h2>Doğrulama kodu</h2><p>Authenticator uygulamandaki 6 haneli kodu girerek girişini tamamla.</p><label>6 haneli kod<input id="mfa-login-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label><button class="btn btn-primary btn-wide" type="submit">Doğrula ve giriş yap</button><div id="mfa-login-message" class="form-message" role="status"></div></form></dialog>
   <div id="toast" class="toast" role="status"></div>
