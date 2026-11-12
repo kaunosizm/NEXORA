@@ -416,3 +416,13 @@
  .friend-search-row{align-items:flex-start}
  .community-settings-actions{position:sticky;bottom:-16px;padding:12px 0 0;background:#111522}
 }
+
+.member-manage-dialog{width:min(520px,calc(100% - 24px));max-height:88vh;overflow:auto}
+.member-manage-box{position:relative;padding:27px;display:grid;gap:14px}
+.member-manage-box h2{font:700 24px "Space Grotesk";margin:0}
+.member-manage-box label{display:grid;gap:7px;color:#c4cce0;font-size:11px}
+.member-manage-box input:not([type=color]),.member-manage-box select,.member-manage-box textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;background:#0c101b;color:var(--text);padding:11px;font:inherit}
+.member-manage-box textarea{min-height:70px;resize:vertical}
+.member-manage-fields{display:grid;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#ffffff04}
+.member-manage-box input[type=color]{width:100%;height:38px;border:1px solid var(--line);border-radius:9px;background:#0c101b;padding:4px}
+@media(max-width:650px){.member-manage-box{padding:22px 16px}}
