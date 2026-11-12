@@ -48,9 +48,7 @@
     <main class="main">
       <section id="view-feed" class="view active">
         <div class="page-heading"><div><div class="eyebrow">TOPLULUĞUN NABZI</div><h1>Akış<span class="gradient-text">.</span></h1><p>Topluluklardan en yeni paylaşımlar.</p></div><button class="btn btn-quiet" id="refresh-feed">↻ Yenile</button></div>
-        <div class="compose card">
-          <div class="compose-avatar">N</div><div class="compose-body"><textarea id="post-content" maxlength="1200" placeholder="Aklından neler geçiyor? Toplulukla paylaş..."></textarea><div class="compose-bottom"><span>Fikirlerini paylaş, sohbeti başlat.</span><button class="btn btn-primary" id="publish-post">Paylaş <b>↗</b></button></div></div>
-        </div>
+        <div class="card feed-community-note"><span>◈</span><div><strong>Paylaşımlar topluluklarda yapılır.</strong><p>Metin, fotoğraf ve sesli mesaj göndermek için katıldığın bir topluluğu aç.</p></div></div>
         <div id="feed-list" class="feed-list"><div class="loading">Akış yükleniyor<span>...</span></div></div>
       </section>
       <section id="view-explore" class="view">
@@ -62,6 +60,22 @@
         <div class="page-heading"><div><div class="eyebrow">AYNI FREKANSTA BULUŞ</div><h1>Topluluklar<span class="gradient-text">.</span></h1><p>İlgini çeken topluluklara katıl veya kendi alanını oluştur.</p></div></div>
         <form id="community-form" class="card community-create"><div><h2>Yeni bir alan oluştur</h2><p>İlgi alanını bir topluluğa dönüştür.</p></div><div class="form-grid"><input id="community-name" maxlength="48" placeholder="Topluluk adı" required><input id="community-slug" maxlength="56" placeholder="adres-adi" required><textarea id="community-description" maxlength="280" placeholder="Topluluğunu kısaca tanıt..."></textarea></div><button class="btn btn-primary" type="submit">Topluluk oluştur +</button></form>
         <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><span id="community-count" class="muted"></span></div><div id="community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div>
+      </section>
+      <section id="view-community-room" class="view">
+        <div class="page-heading room-heading"><div><button class="btn btn-quiet" id="room-back">← Topluluklara dön</button><div class="eyebrow">TOPLULUK SOHBETİ</div><h1 id="room-title">Topluluk</h1><p id="room-description">Üyelerle paylaşım yap.</p></div></div>
+        <div class="card room-shell">
+          <div id="room-messages" class="room-messages"><div class="loading">Mesajlar yükleniyor...</div></div>
+          <form id="room-form" class="room-compose">
+            <textarea id="room-message" maxlength="1200" placeholder="Topluluğa bir mesaj yaz..." aria-label="Mesaj"></textarea>
+            <div class="room-compose-actions">
+              <label class="btn btn-quiet room-attach" for="room-file">＋ Fotoğraf / Ses</label>
+              <input id="room-file" type="file" accept="image/jpeg,image/png,image/webp,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" hidden>
+              <button type="button" class="btn btn-quiet" id="record-audio">● Ses kaydet</button>
+              <span id="record-status" class="muted"></span>
+              <button type="submit" class="btn btn-primary">Gönder ↗</button>
+            </div>
+          </form>
+        </div>
       </section>
       <section id="view-profile" class="view">
         <div class="page-heading"><div><div class="eyebrow">SENİN ALANIN</div><h1>Profilim<span class="gradient-text">.</span></h1><p>Topluluğa kendini tanıt.</p></div></div>
