@@ -38,7 +38,7 @@
     document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
     if (name === "home") loadHome();
-    if (name === "communities") loadCommunities(targetId);
+    if (name === "communities") loadCommunities();
     if (name === "friends") loadFriends();
     if (name === "messages") loadMessages();
     if (name === "profile") loadProfile();
@@ -179,7 +179,7 @@
     if (error) return toast(error.message);
     const join = await db.from("community_members").insert({community_id:data.id,user_id:user.id,role:"owner"});
     if (join.error) return toast("Topluluk oluştu ancak üyelik kaydedilemedi: " + join.error.message);
-    e.target.reset(); toast("Topluluğun oluşturuldu!"); await loadCommunities(targetId);
+    e.target.reset(); toast("Topluluğun oluşturuldu!"); await loadCommunities();
   });
   async function loadProfile() {
     if (!user) { $("profile-display").value=""; $("profile-bio").value=""; return; }
@@ -242,11 +242,11 @@
       if(joinedResult.error&&!joinedResult.error.message.includes("duplicate"))return toast(joinedResult.error.message);
       const updated=await db.from("community_join_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",request.id);
       if(updated.error)return toast(updated.error.message);
-      toast("Katılma isteği onaylandı.");loadCommunities(targetId);
+      toast("Katılma isteği onaylandı.");loadCommunities();
     }));
     $("community-request-list").querySelectorAll("[data-reject-request]").forEach(btn=>btn.addEventListener("click",async()=>{
       const updated=await db.from("community_join_requests").update({status:"rejected",reviewed_at:new Date().toISOString()}).eq("id",btn.dataset.rejectRequest);
-      if(updated.error)return toast(updated.error.message);toast("İstek reddedildi.");loadCommunities(targetId);
+      if(updated.error)return toast(updated.error.message);toast("İstek reddedildi.");loadCommunities();
     }));
   }
   async function findProfiles(ids){const clean=[...new Set(ids.filter(Boolean))];if(!clean.length)return [];const {data,error}=await db.from("profiles").select("id,username,display_name,avatar_url").in("id",clean);if(error)throw error;return data||[];}
