@@ -120,3 +120,43 @@ create table if not exists public.community_join_requests (
 );
 create index if not exists community_join_requests_owner_idx on public.community_join_requests(community_id,status,created_at);
 alter table public.community_join_requests enable row level security;
+
+-- Access policies for discoverable private communities with private member content.
+drop policy if exists "Community directory is readable" on public.communities;
+create policy "Community directory is readable" on public.communities for select to anon,authenticated using (true);
+drop policy if exists "Signed-in users create communities" on public.communities;
+create policy "Signed-in users create communities" on public.communities for insert to authenticated with check (created_by=(select auth.uid()) and visibility in ('public','private'));
+drop policy if exists "Users join public communities or claim ownership of their own" on public.community_members;
+create policy "Users join public communities or claim ownership of their own" on public.community_members for insert to authenticated with check (
+  (user_id=(select auth.uid()) and ((role='member' and exists(select 1 from public.communities c where c.id=community_id and c.visibility='public')) or (role='owner' and exists(select 1 from public.communities c where c.id=community_id and c.created_by=(select auth.uid())))))
+  or (role='member' and exists(select 1 from public.communities c where c.id=community_id and c.created_by=(select auth.uid())))
+);
+drop policy if exists "Users create join requests" on public.community_join_requests;
+create policy "Users create join requests" on public.community_join_requests for insert to authenticated with check (
+  user_id=(select auth.uid()) and status='pending'
+  and exists(select 1 from public.communities c where c.id=community_join_requests.community_id and c.visibility='private')
+  and not exists(select 1 from public.community_members m where m.community_id=community_join_requests.community_id and m.user_id=(select auth.uid()))
+);
+drop policy if exists "Users and owners read join requests" on public.community_join_requests;
+create policy "Users and owners read join requests" on public.community_join_requests for select to authenticated using (
+  user_id=(select auth.uid()) or exists(select 1 from public.communities c where c.id=community_join_requests.community_id and c.created_by=(select auth.uid()))
+);
+drop policy if exists "Owners review join requests" on public.community_join_requests;
+create policy "Owners review join requests" on public.community_join_requests for update to authenticated using (
+  exists(select 1 from public.communities c where c.id=community_join_requests.community_id and c.created_by=(select auth.uid()))
+) with check (
+  exists(select 1 from public.communities c where c.id=community_join_requests.community_id and c.created_by=(select auth.uid()))
+  and status in ('approved','rejected')
+);
+revoke update on public.community_join_requests from authenticated;
+grant update(status,reviewed_at) on public.community_join_requests to authenticated;
+drop policy if exists "Community posts are readable" on public.posts;
+create policy "Public community posts readable" on public.posts for select to anon
+using (community_id is not null and exists(select 1 from public.communities c where c.id=posts.community_id and c.visibility='public'));
+create policy "Members read community posts" on public.posts for select to authenticated using (
+  community_id is not null and exists(select 1 from public.communities c where c.id=posts.community_id and (
+    c.visibility='public' or exists(select 1 from public.community_members m where m.community_id=c.id and m.user_id=(select auth.uid()))
+  ))
+);
+grant select,insert on public.community_join_requests to authenticated;
+revoke all on public.community_join_requests from anon;
