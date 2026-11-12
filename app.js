@@ -11,7 +11,7 @@
   };
   if (!window.supabase || !cfg.SUPABASE_URL || !cfg.SUPABASE_PUBLISHABLE_KEY) {
     $("connection-state").innerHTML = "<i></i> Yapılandırma eksik";
-    $("feed-list").innerHTML = '<div class="loading">Supabase bağlantı ayarları bulunamadı. config.js dosyasını kontrol edin.</div>';
+    $("home-community-list").innerHTML = '<div class="loading">Supabase bağlantı ayarları bulunamadı. config.js dosyasını kontrol edin.</div>';
     return;
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
@@ -38,7 +38,7 @@
     document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
     if (name === "home") loadHome();
-    if (name === "communities") loadCommunities();
+    if (name === "communities") loadCommunities(targetId);
     if (name === "friends") loadFriends();
     if (name === "messages") loadMessages();
     if (name === "profile") loadProfile();
@@ -179,7 +179,7 @@
     if (error) return toast(error.message);
     const join = await db.from("community_members").insert({community_id:data.id,user_id:user.id,role:"owner"});
     if (join.error) return toast("Topluluk oluştu ancak üyelik kaydedilemedi: " + join.error.message);
-    e.target.reset(); toast("Topluluğun oluşturuldu!"); await loadCommunities();
+    e.target.reset(); toast("Topluluğun oluşturuldu!"); await loadCommunities(targetId);
   });
   async function loadProfile() {
     if (!user) { $("profile-display").value=""; $("profile-bio").value=""; return; }
@@ -192,33 +192,6 @@
     $("profile-avatar-image").classList.toggle("hidden",!data.avatar_url);
     $("profile-avatar").classList.toggle("hidden",!!data.avatar_url);
     if(data.avatar_url) $("profile-avatar-image").src=data.avatar_url;
-  }
-  function authorLabel(p) { const founder=p.id==="242245a8-acf0-489a-9ba4-e9e4c1593f19"; return `<span class="${founder?"founder-name":""}">${esc(p.display_name||p.username||"NEXORA üyesi")}</span>${founder?' <span class="founder-badge" title="NEXORA Kurucusu">♛ KURUCU</span>':""}`; }
-  function postMarkup(post) {
-    const p = post.profiles || {}; const comments = post.comments || []; const liked = user && (post.post_likes || []).some(x => x.user_id === user.id);
-    return `<article class="card post-card" data-post="${post.id}"><div class="post-head">${p.avatar_url?`<img class="post-avatar post-avatar-image" src="${esc(p.avatar_url)}" alt="">`:`<div class="post-avatar">${esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())}</div>`}<div><div class="post-author">${authorLabel(p)}</div><div class="post-meta">@${esc(p.username||"uye")} · ${esc(post.communities?.name||"Topluluk")} · ${esc(when(post.created_at))}</div></div></div><div class="post-content">${esc(post.content)}</div><div class="post-actions"><button class="action-btn ${liked?"liked":""}" data-like>${liked?"♥":"♡"} ${(post.post_likes||[]).length} Beğeni</button><span class="action-btn">▢ ${comments.length} Yorum</span></div><div class="comment-list">${comments.map(c=>`<div class="comment"><strong>@${esc(c.profiles?.username||"uye")}</strong>${esc(c.content)}</div>`).join("")}</div><form class="comment-form"><input maxlength="500" placeholder="Yorumunu yaz..." aria-label="Yorum"><button type="submit">Gönder</button></form></article>`;
-  }
-  async function fetchPosts() {
-    const {data,error} = await db.from("posts").select("id,content,created_at,author_id,community_id,profiles!posts_author_id_fkey(id,username,display_name,avatar_url),communities!posts_community_id_fkey(name),post_likes(user_id),comments(id,content,created_at,profiles!comments_author_id_fkey(id,username,display_name))").not("community_id","is",null).order("created_at",{ascending:false}).limit(40);
-    if (error) throw error; return data || [];
-  }
-  function bindPostActions(root) {
-    root.querySelectorAll("[data-post]").forEach(card => {
-      const postId = card.dataset.post;
-      card.querySelector("[data-like]")?.addEventListener("click", async () => {
-        if (!requireUser()) return;
-        const {data:existing,error:checkError} = await db.from("post_likes").select("post_id").eq("post_id",postId).eq("user_id",user.id).maybeSingle();
-        if (checkError) return toast(checkError.message);
-        const result = existing ? await db.from("post_likes").delete().eq("post_id",postId).eq("user_id",user.id) : await db.from("post_likes").insert({post_id:postId,user_id:user.id});
-        if (result.error) return toast(result.error.message); await loadFeed();
-      });
-      card.querySelector(".comment-form")?.addEventListener("submit", async (e) => {
-        e.preventDefault(); if (!requireUser()) return;
-        const input = e.currentTarget.querySelector("input"); const content = input.value.trim(); if (!content) return;
-        const {error} = await db.from("comments").insert({post_id:postId,author_id:user.id,content});
-        if (error) return toast(error.message); await loadFeed();
-      });
-    });
   }
   async function loadHome(){await loadCommunities("home-community-list");}
   async function loadCommunities(targetId="community-list") {
@@ -251,13 +224,13 @@
     listBox.querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return; const {error:joinError}=await db.from("community_members").insert({community_id:btn.dataset.join,user_id:user.id,role:"member"});
       if(joinError && !joinError.message.includes("duplicate"))return toast(joinError.message);
-      toast("Topluluğa katıldın!"); loadCommunities();
+      toast("Topluluğa katıldın!"); loadCommunities(targetId);
     }));
     listBox.querySelectorAll("[data-request]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return;
       const {error:requestError}=await db.from("community_join_requests").insert({community_id:btn.dataset.request,user_id:user.id,status:"pending"});
       if(requestError)return toast(requestError.message);
-      toast("Katılma isteğin gönderildi.");loadCommunities();
+      toast("Katılma isteğin gönderildi.");loadCommunities(targetId);
     }));
     if(targetId==="home-community-list")return;
     const requestBox=$("community-requests");
@@ -269,11 +242,11 @@
       if(joinedResult.error&&!joinedResult.error.message.includes("duplicate"))return toast(joinedResult.error.message);
       const updated=await db.from("community_join_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",request.id);
       if(updated.error)return toast(updated.error.message);
-      toast("Katılma isteği onaylandı.");loadCommunities();
+      toast("Katılma isteği onaylandı.");loadCommunities(targetId);
     }));
     $("community-request-list").querySelectorAll("[data-reject-request]").forEach(btn=>btn.addEventListener("click",async()=>{
       const updated=await db.from("community_join_requests").update({status:"rejected",reviewed_at:new Date().toISOString()}).eq("id",btn.dataset.rejectRequest);
-      if(updated.error)return toast(updated.error.message);toast("İstek reddedildi.");loadCommunities();
+      if(updated.error)return toast(updated.error.message);toast("İstek reddedildi.");loadCommunities(targetId);
     }));
   }
   async function findProfiles(ids){const clean=[...new Set(ids.filter(Boolean))];if(!clean.length)return [];const {data,error}=await db.from("profiles").select("id,username,display_name,avatar_url").in("id",clean);if(error)throw error;return data||[];}
@@ -463,7 +436,7 @@
       await updateAuth(data.session);
     } catch(err) {
       setConnection(false,"Bağlantı hatası");
-      $("feed-list").innerHTML='<div class="loading">'+esc(err.message)+'</div>';
+      $("home-community-list").innerHTML='<div class="loading">'+esc(err.message)+'</div>';
       console.error("NEXORA session bootstrap:",err);
     }
   })();
