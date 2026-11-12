@@ -128,6 +128,8 @@
     finally{button.disabled=false;}
   });
   $("room-back").addEventListener("click",()=>setView("communities"));
+  $("community-menu-toggle").addEventListener("click",()=>document.querySelector(".layout").classList.toggle("community-nav-open"));
+  $("sidebar-logout").addEventListener("click",async()=>{if(user&&confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}});
   $("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const email = $("auth-email").value.trim(); const password = $("auth-password").value;
     const button = $("auth-submit"); button.disabled = true; $("auth-message").textContent = "İşleniyor...";
@@ -168,7 +170,6 @@
       const changed=await db.rpc("change_username",{p_username:next});if(changed.error)throw changed.error;
       const refreshed=await db.from("profiles").select("id,username,display_name").eq("id",user.id).single();if(refreshed.error)throw refreshed.error;
       profile={...profile,username:refreshed.data.username};
-      $("user-chip").innerHTML=refreshed.data.id===FOUNDER_UID?'<span class="founder-name">@'+esc(refreshed.data.username)+'</span> <span class="founder-badge">♛</span>':"@"+esc(refreshed.data.username);
       $("username-current-password").value="";message.textContent="Kullanıcı adın güncellendi.";toast("Kullanıcı adın değiştirildi.");await loadProfile();await loadSettings();
     }catch(err){message.textContent=err.message||"Kullanıcı adı değiştirilemedi.";}
     finally{button.disabled=false;}
@@ -184,11 +185,18 @@
     if (join.error) return toast("Topluluk oluştu ancak üyelik kaydedilemedi: " + join.error.message);
     e.target.reset(); toast("Topluluğun oluşturuldu!"); await loadCommunities();
   });
+  function updateMiniProfile(data){
+    const name=data?.display_name||data?.username||"Profil",username="@"+(data?.username||"kullanıcı");
+    ["sidebar-profile-name","room-profile-name"].forEach(id=>{if($(id))$(id).textContent=name;});
+    ["sidebar-profile-username","room-profile-username"].forEach(id=>{if($(id))$(id).textContent=username;});
+    ["sidebar-profile-avatar","room-profile-avatar"].forEach(id=>{const el=$(id);if(!el)return;el.innerHTML=data?.avatar_url?'<img src="'+esc(data.avatar_url)+'" alt="">':esc(name.slice(0,1).toUpperCase());});
+  }
   async function loadProfile() {
     if (!user) { $("profile-display").value=""; $("profile-bio").value=""; return; }
     const {data,error} = await db.from("profiles").select("username,display_name,bio,avatar_url,username_changed_at").eq("id",user.id).maybeSingle();
     if (error) return toast(error.message);
     profile = data; if (!data) return;
+    updateMiniProfile(data);
     $("profile-display").value = data.display_name || "";
     $("profile-bio").value = data.bio || "";
     $("profile-avatar").textContent = (data.display_name || data.username || "N").slice(0,1).toUpperCase();
@@ -319,7 +327,7 @@
       if(revision!==authRevision)return;
       if(aal.data?.nextLevel==="aal2"&&aal.data?.currentLevel!=="aal2"){
         $("welcome-screen").classList.add("hidden");document.querySelector(".layout").classList.add("hidden");
-        $("user-chip").classList.add("hidden");$("auth-open").classList.add("hidden");
+        $("auth-open").classList.add("hidden");
         if(!mfaLoginActive){
           mfaLoginActive=true;
           const factors=await db.auth.mfa.listFactors();
@@ -339,16 +347,14 @@
     if($("mfa-login-dialog").open)$("mfa-login-dialog").close();
     $("welcome-screen").classList.toggle("hidden",!!user);
     document.querySelector(".layout").classList.toggle("hidden",!user);
-    $("auth-open").classList.add("hidden"); $("user-chip").classList.toggle("hidden",!user);
+    $("auth-open").classList.add("hidden");
     if (user) {
-      const {data,error:profileError} = await db.from("profiles").select("id,username,display_name").eq("id",user.id).maybeSingle();
+      const {data,error:profileError} = await db.from("profiles").select("id,username,display_name,bio,avatar_url").eq("id",user.id).maybeSingle();
       if (revision !== authRevision) return;
       if (profileError) console.error("NEXORA profile lookup:",profileError);
-      profile = data; $("user-chip").innerHTML = data?.id===FOUNDER_UID ? '<span class="founder-name">@'+esc(data.username||"kurucu")+'</span> <span class="founder-badge">♛</span>' : "@"+esc(data?.username || user.email?.split("@")[0] || "üye");
+      profile = data; updateMiniProfile(data||{username:user.email?.split("@")[0]||"üye"});
       $("admin-nav").classList.toggle("hidden",user.id!==FOUNDER_UID);
-      $("user-chip").title = "Çıkış yap"; $("user-chip").style.cursor="pointer";
-      $("user-chip").onclick = async()=>{if(confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}};
-    } else { profile=null; $("user-chip").onclick=null; $("admin-nav").classList.add("hidden"); }
+    } else { profile=null; updateMiniProfile(null); $("admin-nav").classList.add("hidden"); }
     if (revision !== authRevision) return;
     await Promise.all([loadHome(),loadCommunities()]);
   }
