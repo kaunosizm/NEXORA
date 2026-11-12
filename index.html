@@ -59,18 +59,36 @@
         <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><span id="community-count" class="muted"></span></div><div id="community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div><div id="community-requests" class="card community-requests hidden"><h2 class="section-title">Katılma istekleri</h2><div id="community-request-list"></div></div>
       </section>
       <section id="view-community-room" class="view">
-        <div class="page-heading room-heading"><div><button class="btn btn-quiet" id="room-back">← Topluluklara dön</button><div class="eyebrow">TOPLULUK SOHBETİ</div><h1 id="room-title">Topluluk</h1><p id="room-description">Üyelerle paylaşım yap.</p></div></div>
-        <div class="card room-shell">
-          <div id="room-messages" class="room-messages"><div class="loading">Mesajlar yükleniyor...</div></div>
-          <form id="room-form" class="room-compose">
-            <div class="room-input-row"><textarea id="room-message" maxlength="1200" placeholder="Topluluğa bir mesaj yaz..." aria-label="Mesaj"></textarea><button type="submit" class="icon-action send-action" aria-label="Mesaj gönder" title="Gönder">➤</button></div>
-            <div class="room-compose-actions">
-              <label class="icon-action" for="room-file" aria-label="Dosya ekle" title="Dosya ekle">📎</label>
-              <input id="room-file" type="file" accept="image/jpeg,image/png,image/webp,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" hidden>
-              <button type="button" class="icon-action" id="record-audio" aria-label="Ses kaydet" title="Ses kaydet">🎙</button>
-              <span id="record-status" class="muted"></span><span id="room-file-name" class="muted"></span>
+        <div class="page-heading room-heading"><div><button class="btn btn-quiet" id="room-back">← Topluluklara dön</button><div class="eyebrow">TOPLULUK ALANI</div><h1 id="room-title">Topluluk</h1><p id="room-description">Topluluk kanalları, odaları ve üyeleri.</p></div></div>
+        <div class="card room-shell room-workspace">
+          <aside class="room-sidebar">
+            <div class="room-sidebar-section">
+              <div class="room-sidebar-heading"><span>KANALLAR</span><button id="channel-create-toggle" class="room-add-inline hidden" type="button" title="Kanal oluştur">+</button></div>
+              <form id="channel-create-form" class="room-inline-form hidden"><input id="channel-name" maxlength="32" placeholder="Yeni kanal adı" required><button class="btn btn-primary" type="submit">Ekle</button></form>
+              <div id="room-channel-list"><div class="loading">Kanallar yükleniyor...</div></div>
+              <button id="room-create-toggle" class="btn btn-quiet room-create-trigger hidden" type="button">+ Yeni oda oluştur</button>
+              <form id="room-create-form" class="room-inline-form hidden">
+                <select id="room-create-channel" required aria-label="Kanal seç"></select>
+                <input id="room-name" maxlength="32" placeholder="Oda adı" required>
+                <input id="room-topic" maxlength="120" placeholder="Oda açıklaması (isteğe bağlı)">
+                <button class="btn btn-primary" type="submit">Oda oluştur</button>
+              </form>
             </div>
-          </form>
+            <div class="room-sidebar-section room-members-section"><div class="room-sidebar-heading"><span>ÜYELER</span><span id="room-member-count" class="muted">0</span></div><div id="room-member-list"><div class="loading">Üyeler yükleniyor...</div></div></div>
+          </aside>
+          <section class="room-main">
+            <div class="room-active-heading"><div><div class="eyebrow" id="room-channel-name">GENEL</div><h2 id="active-room-title"># sohbet</h2><p id="active-room-topic">Topluluğun genel sohbet odası</p></div></div>
+            <div id="room-messages" class="room-messages"><div class="loading">Mesajlar yükleniyor...</div></div>
+            <form id="room-form" class="room-compose">
+              <div class="room-input-row"><textarea id="room-message" maxlength="1200" placeholder="Bu odaya bir mesaj yaz..." aria-label="Mesaj"></textarea><button type="submit" class="icon-action send-action" aria-label="Mesaj gönder" title="Gönder">➤</button></div>
+              <div class="room-compose-actions">
+                <label class="icon-action" for="room-file" aria-label="Dosya ekle" title="Dosya ekle">📎</label>
+                <input id="room-file" type="file" accept="image/jpeg,image/png,image/webp,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" hidden>
+                <button type="button" class="icon-action" id="record-audio" aria-label="Ses kaydet" title="Ses kaydet">🎙</button>
+                <span id="record-status" class="muted"></span><span id="room-file-name" class="muted"></span>
+              </div>
+            </form>
+          </section>
         </div>
       </section>
       <section id="view-friends" class="view">
