@@ -439,31 +439,44 @@
     await loadCommunityStructure();
     await subscribeToActiveRoom();
   }
+  let managingMemberId=null;
   async function manageCommunityMember(targetId,targetRole){
-    const choice=prompt("Üye işlemi: 1=Rol ata, 2=Sustur, 3=Yasakla, 4=Üyeyi çıkar, 5=Susturmayı kaldır");
-    if(!choice)return;
-    if(choice==="1"){
-      const role=prompt("Yeni rol: member / moderator / admin","member");if(!role)return;
-      if(!["member","moderator","admin"].includes(role))return toast("Geçersiz rol.");
-      const customName=prompt("Görünen rol adı (isteğe bağlı):","")||"";
-      const color=prompt("Rol rengi HEX (örn. #B58AFF), isteğe bağlı:","")||"";
-      const r=await db.rpc("community_assign_role",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_role:role,p_role_name:customName||null,p_role_color:color||null});
-      if(r.error)return toast(r.error.message);toast("Üye rolü güncellendi.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
-    }else if(choice==="2"||choice==="3"){
-      const mins=Number(prompt("Süre dakika olarak (1-43200):",choice==="2"?"60":"1440"));
-      if(!Number.isInteger(mins)||mins<1||mins>43200)return toast("Süre 1-43200 dakika olmalı.");
-      const reason=prompt("Sebep (isteğe bağlı):","")||"";
-      const r=await db.rpc("community_moderate_member",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_action:choice==="2"?"mute":"ban",p_duration_minutes:mins,p_reason:reason});
-      if(r.error)return toast(r.error.message);toast(choice==="2"?"Üye susturuldu.":"Üye topluluktan yasaklandı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
-    }else if(choice==="5"){
-      const r=await db.rpc("community_moderate_member",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_action:"unmute",p_duration_minutes:null,p_reason:""});
-      if(r.error)return toast(r.error.message);toast("Üyenin susturması kaldırıldı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
-    }else if(choice==="4"){
-      if(!confirm("Bu üyeyi topluluktan çıkarmak istiyor musun?"))return;
-      const r=await db.from("community_members").delete().eq("community_id",activeCommunity.id).eq("user_id",targetId);
-      if(r.error)return toast(r.error.message);toast("Üye topluluktan çıkarıldı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
-    }
+    managingMemberId=targetId;
+    $("member-manage-action").value="role";
+    $("member-manage-role").value=targetRole==="owner"?"member":targetRole;
+    $("member-manage-role-name").value="";
+    $("member-manage-role-color").value="#B58AFF";
+    $("member-manage-duration").value="60";
+    $("member-manage-reason").value="";
+    updateMemberManageFields();
+    $("member-manage-dialog").showModal();
   }
+  function updateMemberManageFields(){
+    const action=$("member-manage-action").value;
+    $("member-role-fields").classList.toggle("hidden",action!=="role");
+    $("member-duration-fields").classList.toggle("hidden",!["mute","ban"].includes(action));
+  }
+  $("member-manage-action").addEventListener("change",updateMemberManageFields);
+  $("member-manage-close").addEventListener("click",()=>$("member-manage-dialog").close());
+  $("member-manage-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!activeCommunity||!managingMemberId)return;
+    const action=$("member-manage-action").value;
+    let result;
+    if(action==="role"){
+      result=await db.rpc("community_assign_role",{p_community_id:activeCommunity.id,p_target_user_id:managingMemberId,p_role:$("member-manage-role").value,p_role_name:$("member-manage-role-name").value.trim()||null,p_role_color:$("member-manage-role-color").value||null});
+    }else if(action==="mute"||action==="ban"||action==="unmute"){
+      const duration=action==="unmute"?null:Number($("member-manage-duration").value);
+      if(action!=="unmute"&&(!Number.isInteger(duration)||duration<1||duration>43200))return toast("Süre 1-43200 dakika olmalı.");
+      result=await db.rpc("community_moderate_member",{p_community_id:activeCommunity.id,p_target_user_id:managingMemberId,p_action:action,p_duration_minutes:duration,p_reason:$("member-manage-reason").value.trim()});
+    }else{
+      if(!confirm("Bu üyeyi topluluktan çıkarmak istiyor musun?"))return;
+      result=await db.from("community_members").delete().eq("community_id",activeCommunity.id).eq("user_id",managingMemberId);
+    }
+    if(result.error)return toast(result.error.message);
+    $("member-manage-dialog").close();managingMemberId=null;
+    toast(action==="role"?"Üye rolü güncellendi.":action==="mute"?"Üye susturuldu.":action==="ban"?"Üye yasaklandı.":action==="unmute"?"Susturma kaldırıldı.":"Üye topluluktan çıkarıldı.");
+    await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
+  });
   async function openCommunitySettings(){
     if(!activeCommunity)return;
     const [settings,community]=await Promise.all([
