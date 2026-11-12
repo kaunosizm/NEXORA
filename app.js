@@ -37,6 +37,7 @@
   const setView = (name) => {
     document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
+    const appLayout=document.querySelector(".layout");appLayout.classList.toggle("community-mode",name==="community-room");appLayout.classList.remove("community-nav-open");
     if (name === "home") loadHome();
     if (name === "communities") loadCommunities();
     if (name === "friends") loadFriends();
