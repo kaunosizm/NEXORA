@@ -184,9 +184,10 @@ create table if not exists public.friend_requests (
  receiver_id uuid not null references public.profiles(id) on delete cascade,
  status text not null default 'pending' check(status in ('pending','accepted','rejected')),
  created_at timestamptz not null default now(),
- unique(sender_id,receiver_id),check(sender_id<>receiver_id)
+ check(sender_id<>receiver_id)
 );
 create unique index if not exists friend_requests_one_pending_pair on public.friend_requests(least(sender_id,receiver_id),greatest(sender_id,receiver_id)) where status='pending';
+create unique index if not exists friend_requests_pending_direction_idx on public.friend_requests(sender_id,receiver_id) where status='pending';
 create index if not exists friend_requests_receiver_idx on public.friend_requests(receiver_id,status,created_at desc);
 alter table public.friend_requests enable row level security;
 create table if not exists public.friendships (
