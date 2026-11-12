@@ -130,6 +130,39 @@
   $("room-back").addEventListener("click",()=>setView("communities"));
   $("community-menu-toggle").addEventListener("click",()=>document.querySelector(".layout").classList.toggle("community-nav-open"));
   $("sidebar-logout").addEventListener("click",async()=>{if(user&&confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}});
+
+  let globalSearchType="all",globalSearchTimer=null;
+  $("global-search-open").addEventListener("click",()=>{$("global-search-dialog").showModal();$("global-search-input").focus();});
+  $("global-search-close").addEventListener("click",()=>$("global-search-dialog").close());
+  $("global-search-dialog").addEventListener("click",e=>{if(e.target===$("global-search-dialog"))$("global-search-dialog").close();});
+  document.querySelectorAll("[data-search-type]").forEach(b=>b.addEventListener("click",()=>{globalSearchType=b.dataset.searchType;document.querySelectorAll("[data-search-type]").forEach(x=>x.classList.toggle("active",x===b));performGlobalSearch();}));
+  $("global-search-input").addEventListener("input",()=>{clearTimeout(globalSearchTimer);globalSearchTimer=setTimeout(performGlobalSearch,220);});
+  document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("global-search-dialog").showModal();$("global-search-input").focus();}});
+  async function performGlobalSearch(){
+    const raw=$("global-search-input").value.trim(),term=raw.replace(/[%_,()]/g," ").replace(/\s+/g," ").trim(),box=$("global-search-results");
+    if(term.length<2){box.innerHTML='<p class="empty-note">Aramaya başlamak için en az 2 karakter yaz.</p>';return;}
+    box.innerHTML='<p class="empty-note">Aranıyor...</p>';
+    const wantsProfiles=globalSearchType!=="communities",wantsCommunities=globalSearchType!=="profiles",jobs=[];
+    if(wantsProfiles)jobs.push(db.from("profiles").select("id,username,display_name,bio,avatar_url").or("username.ilike.%"+term+"%,display_name.ilike.%"+term+"%").limit(8));
+    if(wantsCommunities)jobs.push(db.from("communities").select("id,name,slug,description,visibility,created_by").or("name.ilike.%"+term+"%,slug.ilike.%"+term+"%").limit(8));
+    const results=await Promise.all(jobs);let index=0,profiles=[],communities=[],errors=[];
+    if(wantsProfiles){const r=results[index++];if(r.error)errors.push(r.error.message);else profiles=r.data||[];}
+    if(wantsCommunities){const r=results[index++];if(r.error)errors.push(r.error.message);else communities=r.data||[];}
+    const memberIds=new Set(),requestMap=new Map();
+    if(user&&communities.length){
+      const [m,r]=await Promise.all([db.from("community_members").select("community_id").eq("user_id",user.id).in("community_id",communities.map(c=>c.id)),db.from("community_join_requests").select("community_id,status").eq("user_id",user.id).in("community_id",communities.map(c=>c.id))]);
+      (m.data||[]).forEach(x=>memberIds.add(x.community_id));(r.data||[]).forEach(x=>requestMap.set(x.community_id,x.status));
+    }
+    const profileHtml=profiles.map(p=>'<article class="global-result profile-result"><span class="global-result-avatar">'+(p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase()))+'</span><div class="global-result-copy"><strong>'+esc(p.display_name||p.username||"Üye")+'</strong><small>@'+esc(p.username||"uye")+'</small><p>'+esc(p.bio||"Henüz biyografi eklenmemiş.")+'</p></div></article>').join("");
+    const communityHtml=communities.map(c=>{
+      let action=memberIds.has(c.id)?'<button class="btn btn-primary" data-search-open="'+c.id+'">Aç ↗</button>':c.visibility==="private"?(requestMap.has(c.id)?'<button class="btn btn-quiet" disabled>İstek '+(requestMap.get(c.id)==="pending"?"gönderildi":requestMap.get(c.id))+'</button>':'<button class="btn btn-quiet" data-search-request="'+c.id+'">Katılma isteği</button>'):'<button class="btn btn-quiet" data-search-join="'+c.id+'">Katıl +</button>';
+      return '<article class="global-result community-result"><span class="global-result-symbol">◈</span><div class="global-result-copy"><strong>'+esc(c.name)+'</strong><small>'+(c.visibility==="private"?"🔒 Gizli topluluk":"● Herkese açık")+'</small><p>'+esc(c.description||"Topluluğu keşfet.")+'</p></div>'+action+'</article>';
+    }).join("");
+    box.innerHTML=(errors.length?'<p class="empty-note">'+esc(errors.join(" · "))+'</p>':"")+(wantsProfiles?'<div class="global-result-section">PROFİLLER</div>'+(profileHtml||'<p class="empty-note">Eşleşen profil yok.</p>'):"")+(wantsCommunities?'<div class="global-result-section">TOPLULUKLAR</div>'+(communityHtml||'<p class="empty-note">Eşleşen topluluk yok.</p>'):"");
+    box.querySelectorAll("[data-search-open]").forEach(b=>b.addEventListener("click",()=>{$("global-search-dialog").close();openCommunity(communities.find(c=>c.id===b.dataset.searchOpen));}));
+    box.querySelectorAll("[data-search-join]").forEach(b=>b.addEventListener("click",async()=>{if(!requireUser())return;const r=await db.from("community_members").insert({community_id:b.dataset.searchJoin,user_id:user.id,role:"member"});if(r.error&&!r.error.message.includes("duplicate"))return toast(r.error.message);toast("Topluluğa katıldın.");performGlobalSearch();}));
+    box.querySelectorAll("[data-search-request]").forEach(b=>b.addEventListener("click",async()=>{if(!requireUser())return;const r=await db.from("community_join_requests").insert({community_id:b.dataset.searchRequest,user_id:user.id,status:"pending"});if(r.error)return toast(r.error.message);toast("Katılma isteğin gönderildi.");performGlobalSearch();}));
+  }
   $("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const email = $("auth-email").value.trim(); const password = $("auth-password").value;
     const button = $("auth-submit"); button.disabled = true; $("auth-message").textContent = "İşleniyor...";
