@@ -238,3 +238,59 @@ begin
  return new;
 end; $$;
 revoke all on function public.create_default_community_channel() from public,anon,authenticated;
+
+
+-- Final security tightening: hierarchy-aware membership management and word-boundary filter.
+drop policy if exists "Community managers remove members" on public.community_members;
+create policy "Community managers remove members" on public.community_members for delete to authenticated
+using (
+ user_id<>(select auth.uid()) and community_members.role<>'owner'
+ and exists(select 1 from public.community_members actor
+   where actor.community_id=community_members.community_id and actor.user_id=(select auth.uid())
+   and (actor.role='owner' or (actor.role='admin' and community_members.role in ('moderator','member'))
+     or (actor.role='moderator' and community_members.role='member')))
+);
+drop policy if exists "Community owners assign member roles" on public.community_members;
+create policy "Community owners assign member roles" on public.community_members for update to authenticated
+using (
+ user_id<>(select auth.uid()) and community_members.role<>'owner'
+ and exists(select 1 from public.community_members actor
+   where actor.community_id=community_members.community_id and actor.user_id=(select auth.uid())
+   and (actor.role='owner' or (actor.role='admin' and community_members.role in ('moderator','member'))))
+)
+with check (
+ role in ('member','moderator','admin')
+ and exists(select 1 from public.community_members actor
+   where actor.community_id=community_members.community_id and actor.user_id=(select auth.uid())
+   and actor.role in ('owner','admin'))
+);
+
+create or replace function private.enforce_community_message_rules()
+returns trigger language plpgsql security definer set search_path='' as $$
+declare cfg public.community_settings%rowtype; mute_until timestamptz; last_message timestamptz; word text; all_words text[];
+begin
+ select * into cfg from public.community_settings where community_id=new.community_id;
+ select m.muted_until into mute_until from public.community_members m where m.community_id=new.community_id and m.user_id=new.author_id;
+ if mute_until is not null and mute_until>now() then raise exception 'Bu toplulukta % tarihine kadar susturuldun.',to_char(mute_until,'DD.MM.YYYY HH24:MI'); end if;
+ if exists(select 1 from public.community_moderation_actions a where a.community_id=new.community_id and a.target_user_id=new.author_id and a.action_type='ban' and (a.expires_at is null or a.expires_at>now())) then
+   raise exception 'Bu topluluğa erişimin kısıtlanmış.';
+ end if;
+ if cfg.community_id is not null and not cfg.media_enabled and new.message_type in ('image','audio') then
+   raise exception 'Bu toplulukta fotoğraf ve ses paylaşımı kapalı.';
+ end if;
+ if cfg.community_id is not null and cfg.profanity_filter and new.message_type='text' then
+   all_words:=array_cat(array['amk','aq','sik','siktir','orospu','piç','yarrak'],coalesce(cfg.blocked_words,'{}'::text[]));
+   foreach word in array all_words loop
+     if length(trim(word))>=2 and lower(trim(word))=any(regexp_split_to_array(lower(new.content),'[^[:alnum:]_]+')) then
+       raise exception 'Mesajın topluluk kelime filtresine takıldı.';
+     end if;
+   end loop;
+ end if;
+ if coalesce(cfg.slow_mode_seconds,0)>0 and not exists(select 1 from public.community_members m where m.community_id=new.community_id and m.user_id=new.author_id and m.role in ('owner','admin','moderator')) then
+   select max(created_at) into last_message from public.community_messages where room_id=new.room_id and author_id=new.author_id;
+   if last_message is not null and last_message>now()-make_interval(secs=>cfg.slow_mode_seconds) then
+     raise exception 'Yavaş mod açık. Bir sonraki mesaj için biraz bekle.';
+   end if;
+ end if;
+ return new;
+end; $$;
