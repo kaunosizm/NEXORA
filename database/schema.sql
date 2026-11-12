@@ -160,3 +160,73 @@ create policy "Members read community posts" on public.posts for select to authe
 );
 grant select,insert on public.community_join_requests to authenticated;
 revoke all on public.community_join_requests from anon;
+
+alter table public.profiles add column if not exists username_changed_at timestamptz;
+create or replace function public.change_username(p_username text)
+returns timestamptz language plpgsql security definer set search_path = '' as $$
+declare changed_at timestamptz;
+begin
+ if auth.uid() is null then raise exception 'Giriş yapmalısın.'; end if;
+ if p_username is null or p_username !~ '^[a-z0-9_]{3,24}$' then raise exception 'Kullanıcı adı 3-24 karakter olmalı.'; end if;
+ select username_changed_at into changed_at from public.profiles where id=auth.uid() for update;
+ if changed_at is not null and changed_at > now()-interval '7 days' then
+  raise exception 'Kullanıcı adını 7 günde yalnızca bir kez değiştirebilirsin. Sonraki değişiklik: %',to_char(changed_at+interval '7 days','DD.MM.YYYY HH24:MI');
+ end if;
+ update public.profiles set username=p_username,username_changed_at=now(),updated_at=now() where id=auth.uid();
+ return now();
+end; $$;
+revoke all on function public.change_username(text) from public,anon;
+grant execute on function public.change_username(text) to authenticated;
+revoke update(username) on public.profiles from authenticated;
+create table if not exists public.friend_requests (
+ id uuid primary key default gen_random_uuid(),
+ sender_id uuid not null references public.profiles(id) on delete cascade,
+ receiver_id uuid not null references public.profiles(id) on delete cascade,
+ status text not null default 'pending' check(status in ('pending','accepted','rejected')),
+ created_at timestamptz not null default now(),
+ unique(sender_id,receiver_id),check(sender_id<>receiver_id)
+);
+create unique index if not exists friend_requests_one_pending_pair on public.friend_requests(least(sender_id,receiver_id),greatest(sender_id,receiver_id)) where status='pending';
+create index if not exists friend_requests_receiver_idx on public.friend_requests(receiver_id,status,created_at desc);
+alter table public.friend_requests enable row level security;
+create table if not exists public.friendships (
+ user_a uuid not null references public.profiles(id) on delete cascade,
+ user_b uuid not null references public.profiles(id) on delete cascade,
+ created_at timestamptz not null default now(),
+ primary key(user_a,user_b),check(user_a<user_b)
+);
+alter table public.friendships enable row level security;
+create or replace function public.are_friends(a uuid,b uuid) returns boolean language sql stable security definer set search_path='' as $$
+ select exists(select 1 from public.friendships f where f.user_a=least(a,b) and f.user_b=greatest(a,b));
+$$;
+revoke all on function public.are_friends(uuid,uuid) from public,anon;
+grant execute on function public.are_friends(uuid,uuid) to authenticated;
+create or replace function public.accept_friend_request(p_request_id uuid) returns void language plpgsql security definer set search_path='' as $$
+declare req public.friend_requests%rowtype;
+begin
+ select * into req from public.friend_requests where id=p_request_id and receiver_id=auth.uid() and status='pending' for update;
+ if not found then raise exception 'Bekleyen arkadaşlık isteği bulunamadı.'; end if;
+ insert into public.friendships(user_a,user_b) values(least(req.sender_id,req.receiver_id),greatest(req.sender_id,req.receiver_id)) on conflict do nothing;
+ update public.friend_requests set status='accepted' where id=req.id;
+end; $$;
+revoke all on function public.accept_friend_request(uuid) from public,anon;
+grant execute on function public.accept_friend_request(uuid) to authenticated;
+create policy "Participants read friend requests" on public.friend_requests for select to authenticated using(sender_id=auth.uid() or receiver_id=auth.uid());
+create policy "Users send friend requests" on public.friend_requests for insert to authenticated with check(sender_id=auth.uid() and exists(select 1 from public.profiles p where p.id=receiver_id) and not public.are_friends(sender_id,receiver_id));
+create policy "Receivers reject requests" on public.friend_requests for update to authenticated using(receiver_id=auth.uid() and status='pending') with check(receiver_id=auth.uid() and status='rejected');
+create policy "Friends list visible to participants" on public.friendships for select to authenticated using(user_a=auth.uid() or user_b=auth.uid());
+create table if not exists public.direct_messages (
+ id uuid primary key default gen_random_uuid(),
+ sender_id uuid not null references public.profiles(id) on delete cascade,
+ receiver_id uuid not null references public.profiles(id) on delete cascade,
+ content text not null check(char_length(content) between 1 and 2000),
+ created_at timestamptz not null default now(),check(sender_id<>receiver_id)
+);
+create index if not exists direct_messages_pair_created_idx on public.direct_messages(sender_id,receiver_id,created_at desc);
+create index if not exists direct_messages_receiver_created_idx on public.direct_messages(receiver_id,sender_id,created_at desc);
+alter table public.direct_messages enable row level security;
+create policy "Friends read direct messages" on public.direct_messages for select to authenticated using((sender_id=auth.uid() or receiver_id=auth.uid()) and public.are_friends(sender_id,receiver_id));
+create policy "Friends send direct messages" on public.direct_messages for insert to authenticated with check(sender_id=auth.uid() and public.are_friends(sender_id,receiver_id));
+grant select,insert on public.friend_requests,public.direct_messages to authenticated;
+grant select on public.friendships to authenticated;
+revoke all on public.friend_requests,public.friendships,public.direct_messages from anon;
