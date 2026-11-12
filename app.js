@@ -16,7 +16,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityMembers = [], communityRole = "member", roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -363,26 +363,84 @@
 
   async function openCommunity(community) {
     if (!community || !requireUser()) return;
-    const {data:member,error:memberError}=await db.from("community_members").select("community_id").eq("community_id",community.id).eq("user_id",user.id).maybeSingle();
+    const {data:member,error:memberError}=await db.from("community_members").select("community_id,role").eq("community_id",community.id).eq("user_id",user.id).maybeSingle();
     if(memberError||!member) return toast("Bu topluluğun üyesi olmalısın.");
-    activeCommunity=community;
+    activeCommunity=community; communityRole=member.role||"member";
     $("room-title").textContent=community.name;
-    $("room-description").textContent=community.description||"Topluluk üyeleriyle mesajlaş.";
+    $("room-description").textContent=community.description||"Topluluğun kanalları ve üyeleri.";
     setView("community-room");
+    await loadCommunityStructure();
+    await subscribeToActiveRoom();
+  }
+  async function loadCommunityStructure(preferredChannelId=null, preferredRoomId=null) {
+    if(!activeCommunity)return;
+    const [channelsResult,membersResult]=await Promise.all([
+      db.from("community_channels").select("id,community_id,name,created_by,sort_order,created_at").eq("community_id",activeCommunity.id).order("sort_order").order("created_at"),
+      db.from("community_members").select("user_id,role,joined_at,profiles!community_members_user_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("joined_at")
+    ]);
+    if(channelsResult.error){$("room-channel-list").innerHTML='<p class="empty-note">'+esc(channelsResult.error.message)+'</p>';return;}
+    if(membersResult.error){$("room-member-list").innerHTML='<p class="empty-note">'+esc(membersResult.error.message)+'</p>';return;}
+    communityChannels=channelsResult.data||[];communityMembers=membersResult.data||[];
+    const ids=communityChannels.map(c=>c.id);
+    const roomsResult=ids.length?await db.from("community_rooms").select("id,community_id,channel_id,name,topic,created_by,sort_order,created_at").in("channel_id",ids).order("sort_order").order("created_at"):{data:[],error:null};
+    if(roomsResult.error){$("room-channel-list").innerHTML='<p class="empty-note">'+esc(roomsResult.error.message)+'</p>';return;}
+    communityRooms=roomsResult.data||[];
+    const canManage=communityRole==="owner"||communityRole==="moderator"||activeCommunity.created_by===user?.id;
+    $("channel-create-toggle").classList.toggle("hidden",!canManage);
+    $("room-create-toggle").classList.toggle("hidden",!canManage);
+    $("room-member-count").textContent=String(communityMembers.length);
+    $("room-member-list").innerHTML=communityMembers.length?communityMembers.map(m=>{
+      const p=m.profiles||{},isCommunityFounder=m.user_id===activeCommunity.created_by,isPlatformFounder=m.user_id===FOUNDER_UID;
+      const label=isCommunityFounder?"KURUCU":m.role==="moderator"?"MODERATÖR":isPlatformFounder?"NEXORA KURUCU":"ÜYE";
+      return '<div class="room-member"><span class="room-member-avatar">'+(p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase()))+'</span><span class="room-member-name"><strong class="'+(isPlatformFounder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong><small>@'+esc(p.username||"uye")+'</small></span><span class="room-member-role '+(isCommunityFounder||isPlatformFounder?'founder-name':'')+'">'+label+'</span></div>';
+    }).join(""):'<p class="empty-note">Henüz üye yok.</p>';
+    const desiredChannel=communityChannels.find(c=>c.id===preferredChannelId)||communityChannels.find(c=>c.id===activeChannel?.id)||communityChannels[0]||null;
+    activeChannel=desiredChannel;
+    const desiredRooms=communityRooms.filter(r=>r.channel_id===activeChannel?.id);
+    activeRoom=desiredRooms.find(r=>r.id===preferredRoomId)||desiredRooms.find(r=>r.id===activeRoom?.id)||desiredRooms[0]||null;
+    $("room-create-channel").innerHTML=communityChannels.map(c=>'<option value="'+c.id+'" '+(c.id===activeChannel?.id?'selected':'')+'>'+esc(c.name)+'</option>').join("");
+    renderCommunityChannels();
+    updateActiveRoomHeading();
     await loadRoomMessages();
-    if(roomChannel) await db.removeChannel(roomChannel);
-    roomChannel=db.channel("community-room-"+community.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"community_messages",filter:"community_id=eq."+community.id},()=>loadRoomMessages()).subscribe();
+  }
+  function renderCommunityChannels(){
+    const canManage=communityRole==="owner"||communityRole==="moderator"||activeCommunity?.created_by===user?.id;
+    $("room-channel-list").innerHTML=communityChannels.map(channel=>{
+      const rooms=communityRooms.filter(r=>r.channel_id===channel.id);
+      return '<div class="room-channel-group"><div class="room-channel-heading"><strong>'+esc(channel.name)+'</strong>'+(canManage?'<button class="room-add-inline" type="button" data-add-room="'+channel.id+'" title="Bu kanala oda ekle">+</button>':'')+'</div>'+rooms.map(room=>'<button type="button" class="room-link '+(activeRoom?.id===room.id?'active':'')+'" data-room-id="'+room.id+'"><span>#</span>'+esc(room.name)+'</button>').join("")+'</div>';
+    }).join("")||'<p class="empty-note">Henüz kanal yok.</p>';
+    $("room-channel-list").querySelectorAll("[data-room-id]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const selected=communityRooms.find(r=>r.id===btn.dataset.roomId);if(!selected)return;
+      activeChannel=communityChannels.find(c=>c.id===selected.channel_id)||null;activeRoom=selected;
+      $("room-create-channel").value=selected.channel_id;
+      renderCommunityChannels();updateActiveRoomHeading();await loadRoomMessages();await subscribeToActiveRoom();
+    }));
+    $("room-channel-list").querySelectorAll("[data-add-room]").forEach(btn=>btn.addEventListener("click",()=>{
+      $("room-create-channel").value=btn.dataset.addRoom;$("room-create-form").classList.remove("hidden");$("room-name").focus();
+    }));
+  }
+  function updateActiveRoomHeading(){
+    $("room-channel-name").textContent=activeChannel?.name||"Kanallar";
+    $("active-room-title").textContent=activeRoom?"# "+activeRoom.name:"Oda seçilmedi";
+    $("active-room-topic").textContent=activeRoom?.topic||"Bu odada topluluk üyeleriyle paylaşım yap.";
+    $("room-form").classList.toggle("hidden",!activeRoom);
+    $("room-messages").innerHTML=activeRoom?'<div class="loading">Mesajlar yükleniyor...</div>':'<div class="room-empty">Mesajlaşmak için bir oda oluşturulmasını veya seçilmesini bekle.</div>';
+  }
+  async function subscribeToActiveRoom(){
+    if(roomChannel){await db.removeChannel(roomChannel);roomChannel=null;}
+    if(!activeRoom)return;
+    roomChannel=db.channel("community-room-"+activeRoom.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"community_messages",filter:"room_id=eq."+activeRoom.id},()=>loadRoomMessages()).subscribe();
   }
   async function loadRoomMessages() {
-    if(!activeCommunity)return;
-    const box=$("room-messages"); box.innerHTML='<div class="loading">Mesajlar yükleniyor...</div>';
-    const {data,error}=await db.from("community_messages").select("id,author_id,message_type,content,media_path,created_at,profiles!community_messages_author_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("created_at",{ascending:true}).limit(150);
+    if(!activeRoom)return;
+    const box=$("room-messages");box.innerHTML='<div class="loading">Mesajlar yükleniyor...</div>';
+    const {data,error}=await db.from("community_messages").select("id,author_id,message_type,content,media_path,created_at,profiles!community_messages_author_id_fkey(username,display_name,avatar_url)").eq("room_id",activeRoom.id).order("created_at",{ascending:true}).limit(150);
     if(error){box.innerHTML='<div class="loading">'+esc(error.message)+'</div>';return;}
-    if(!data?.length){box.innerHTML='<div class="room-empty">Henüz mesaj yok. İlk mesajı sen gönder!</div>';return;}
+    if(!data?.length){box.innerHTML='<div class="room-empty">Bu odada henüz mesaj yok. İlk mesajı sen gönder!</div>';return;}
     const rendered=await Promise.all(data.map(async m=>{
       let media="";
       if(m.media_path){const signed=await db.storage.from("community-media").createSignedUrl(m.media_path,3600);if(!signed.error&&signed.data?.signedUrl){media=m.message_type==="image"?'<img class="room-image" src="'+esc(signed.data.signedUrl)+'" alt="Paylaşılan fotoğraf" loading="lazy">':'<audio class="room-audio" controls preload="none" src="'+esc(signed.data.signedUrl)+'"></audio>';}}
-      const p=m.profiles||{};const founder=m.author_id===FOUNDER_UID;
+      const p=m.profiles||{},founder=m.author_id===FOUNDER_UID;
       return '<article class="room-message">'+(p.avatar_url?'<img class="room-avatar" src="'+esc(p.avatar_url)+'" alt="">':'<div class="room-avatar">'+esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())+'</div>')+'<div class="room-message-body"><div class="room-message-head"><strong class="'+(founder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong> '+(founder?'<span class="founder-badge">♛ KURUCU</span>':'')+' <small>@'+esc(p.username||"uye")+' · '+esc(when(m.created_at))+'</small></div>'+(m.content?'<p>'+esc(m.content)+'</p>':'')+media+'</div></article>';
     }));
     box.innerHTML=rendered.join("");box.scrollTop=box.scrollHeight;
@@ -400,10 +458,29 @@
       const upload=await db.storage.from("community-media").upload(media_path,file,{cacheControl:"3600",upsert:false,contentType:file.type.split(";")[0]});
       if(upload.error)return toast(upload.error.message);
     }
-    const {error}=await db.from("community_messages").insert({community_id:activeCommunity.id,author_id:user.id,message_type,content,media_path});
+    const {error}=await db.from("community_messages").insert({community_id:activeCommunity.id,room_id:activeRoom?.id,author_id:user.id,message_type,content,media_path});
     if(error)return toast(error.message);
     $("room-message").value="";$("room-file").value="";$("room-file-name").textContent="";if(fileOverride)toast("Sesli mesaj gönderildi.");await loadRoomMessages();
   }
+
+  $("channel-create-toggle").addEventListener("click",()=>{$("channel-create-form").classList.toggle("hidden");if(!$("channel-create-form").classList.contains("hidden"))$("channel-name").focus();});
+  $("room-create-toggle").addEventListener("click",()=>{$("room-create-form").classList.toggle("hidden");$("room-create-channel").value=activeChannel?.id||"";if(!$("room-create-form").classList.contains("hidden"))$("room-name").focus();});
+  $("channel-create-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!requireUser()||!activeCommunity)return;
+    const name=$("channel-name").value.trim();if(name.length<2)return toast("Kanal adı en az 2 karakter olmalı.");
+    const {data,error}=await db.from("community_channels").insert({community_id:activeCommunity.id,name,created_by:user.id,sort_order:communityChannels.length}).select("id").single();
+    if(error)return toast(error.message);
+    $("channel-name").value="";$("channel-create-form").classList.add("hidden");await loadCommunityStructure(data.id);toast("Kanal oluşturuldu.");
+  });
+  $("room-create-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!requireUser()||!activeCommunity)return;
+    const name=$("room-name").value.trim(),channelId=$("room-create-channel").value,topic=$("room-topic").value.trim();
+    if(!channelId)return toast("Önce bir kanal oluştur.");
+    if(name.length<2)return toast("Oda adı en az 2 karakter olmalı.");
+    const {data,error}=await db.from("community_rooms").insert({community_id:activeCommunity.id,channel_id:channelId,name,topic,created_by:user.id,sort_order:communityRooms.filter(r=>r.channel_id===channelId).length}).select("id").single();
+    if(error)return toast(error.message);
+    $("room-name").value="";$("room-topic").value="";$("room-create-form").classList.add("hidden");await loadCommunityStructure(channelId,data.id);await subscribeToActiveRoom();toast("Oda oluşturuldu.");
+  });
   $("room-form").addEventListener("submit",async e=>{e.preventDefault();await sendRoomMessage();});
   $("room-file").addEventListener("change",e=>{const file=e.target.files?.[0];$("room-file-name").textContent=file?file.name:"";if(file)toast("Dosya eklendi. Uçak simgesine basarak gönder.");});
   $("record-audio").addEventListener("click",async()=>{
