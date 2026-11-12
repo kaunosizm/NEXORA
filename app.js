@@ -439,6 +439,63 @@
     await loadCommunityStructure();
     await subscribeToActiveRoom();
   }
+  async function manageCommunityMember(targetId,targetRole){
+    const choice=prompt("Üye işlemi: 1=Rol ata, 2=Sustur, 3=Yasakla, 4=Üyeyi çıkar");
+    if(!choice)return;
+    if(choice==="1"){
+      const role=prompt("Yeni rol: member / moderator / admin","member");if(!role)return;
+      if(!["member","moderator","admin"].includes(role))return toast("Geçersiz rol.");
+      const customName=prompt("Görünen rol adı (isteğe bağlı):","")||"";
+      const color=prompt("Rol rengi HEX (örn. #B58AFF), isteğe bağlı:","")||"";
+      const r=await db.rpc("community_assign_role",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_role:role,p_role_name:customName||null,p_role_color:color||null});
+      if(r.error)return toast(r.error.message);toast("Üye rolü güncellendi.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
+    }else if(choice==="2"||choice==="3"){
+      const mins=Number(prompt("Süre dakika olarak (1-43200):",choice==="2"?"60":"1440"));
+      if(!Number.isInteger(mins)||mins<1||mins>43200)return toast("Süre 1-43200 dakika olmalı.");
+      const reason=prompt("Sebep (isteğe bağlı):","")||"";
+      const r=await db.rpc("community_moderate_member",{p_community_id:activeCommunity.id,p_target_user_id:targetId,p_action:choice==="2"?"mute":"ban",p_duration_minutes:mins,p_reason:reason});
+      if(r.error)return toast(r.error.message);toast(choice==="2"?"Üye susturuldu.":"Üye topluluktan yasaklandı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
+    }else if(choice==="4"){
+      if(!confirm("Bu üyeyi topluluktan çıkarmak istiyor musun?"))return;
+      const r=await db.from("community_members").delete().eq("community_id",activeCommunity.id).eq("user_id",targetId);
+      if(r.error)return toast(r.error.message);toast("Üye topluluktan çıkarıldı.");await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
+    }
+  }
+  async function openCommunitySettings(){
+    if(!activeCommunity)return;
+    const [settings,community]=await Promise.all([
+      db.from("community_settings").select("*").eq("community_id",activeCommunity.id).maybeSingle(),
+      db.from("communities").select("name,description,visibility").eq("id",activeCommunity.id).single()
+    ]);
+    if(settings.error||community.error)return toast((settings.error||community.error).message);
+    $("community-setting-name").value=community.data.name||"";
+    $("community-setting-description").value=community.data.description||"";
+    $("community-setting-visibility").value=community.data.visibility||"public";
+    $("community-profanity-filter").checked=settings.data?.profanity_filter??true;
+    $("community-blocked-words").value=(settings.data?.blocked_words||[]).join(", ");
+    $("community-slow-mode").value=String(settings.data?.slow_mode_seconds||0);
+    $("community-media-enabled").checked=settings.data?.media_enabled??true;
+    $("community-settings-dialog").showModal();
+  }
+  $("community-settings-open").addEventListener("click",openCommunitySettings);
+  $("community-settings-close").addEventListener("click",()=>$("community-settings-dialog").close());
+  $("community-settings-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!activeCommunity)return;
+    const settings=await db.rpc("community_update_settings",{p_community_id:activeCommunity.id,p_profanity_filter:$("community-profanity-filter").checked,p_blocked_words:$("community-blocked-words").value.split(",").map(x=>x.trim()).filter(Boolean),p_slow_mode_seconds:Number($("community-slow-mode").value),p_media_enabled:$("community-media-enabled").checked});
+    if(settings.error)return toast(settings.error.message);
+    if(activeCommunity.created_by===user.id){
+      const updated=await db.from("communities").update({name:$("community-setting-name").value.trim(),description:$("community-setting-description").value.trim(),visibility:$("community-setting-visibility").value}).eq("id",activeCommunity.id);
+      if(updated.error)return toast(updated.error.message);
+      activeCommunity={...activeCommunity,name:$("community-setting-name").value.trim(),description:$("community-setting-description").value.trim(),visibility:$("community-setting-visibility").value};
+      $("room-title").textContent=activeCommunity.name;$("room-description").textContent=activeCommunity.description;
+    }
+    $("community-settings-dialog").close();toast("Topluluk ayarları kaydedildi.");
+  });
+  $("community-clear-chat").addEventListener("click",async()=>{
+    if(!activeCommunity||!confirm("Bu topluluğun tüm sohbet mesajları kalıcı olarak silinsin mi?"))return;
+    const r=await db.from("community_messages").delete().eq("community_id",activeCommunity.id);
+    if(r.error)return toast(r.error.message);toast("Topluluk sohbeti temizlendi.");await loadRoomMessages();
+  });
   async function loadCommunityStructure(preferredChannelId=null, preferredRoomId=null) {
     if(!activeCommunity)return;
     const [channelsResult,membersResult]=await Promise.all([
