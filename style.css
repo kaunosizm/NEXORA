@@ -114,3 +114,26 @@
 
 .admin-members{padding:20px;margin-top:18px}.admin-members .section-title{margin:0 0 14px}.admin-member-list{display:grid}.admin-member{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 2px;border-top:1px solid var(--line)}.admin-member strong{font-size:12px}.admin-member small{display:block;color:var(--muted);font-size:10px;margin-top:4px}.admin-member time{font-size:10px;color:#8d98b1;text-align:right}
 @media(max-width:650px){.admin-member{align-items:flex-start}.admin-member time{max-width:105px}}
+
+
+/* Account settings and privacy controls */
+.settings-card{padding:24px;margin-bottom:18px;display:grid;gap:14px;max-width:760px}
+.settings-card h2{font:700 22px "Space Grotesk";margin:5px 0}
+.settings-card p{font-size:12px;color:var(--muted);line-height:1.7;margin:4px 0 8px}
+.settings-card label{display:grid;gap:7px;color:#c5cde0;font-size:12px}
+.settings-card input,.settings-card select{width:100%;background:#0c101b;border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--text);outline:0}
+.settings-card input:focus,.settings-card select:focus{border-color:#a879ff}
+.mfa-status{padding:12px;border:1px solid var(--line);border-radius:10px;font-size:13px;color:#c8d4e8;background:#ffffff05}
+.mfa-setup{padding:18px;border:1px solid #a879ff44;border-radius:14px;background:#a879ff0b;display:grid;gap:12px}
+.mfa-setup img{width:190px;height:190px;object-fit:contain;background:white;padding:8px;border-radius:10px}
+.mfa-setup code{overflow-wrap:anywhere;color:#e1d5ff;font-size:12px}
+.mfa-secret-label{margin-bottom:-8px!important;color:#d4c5ff!important}
+.mfa-setup form{display:grid;gap:12px}
+.settings-help{font-size:11px!important}
+.mfa-login-dialog{max-width:440px}
+.community-visibility{font-size:9px;font-weight:800;letter-spacing:.7px;color:#bca4f3;margin:3px 0 9px}
+.community-requests{margin-top:20px;padding:20px}
+.community-request-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.community-request-row strong{font-size:12px}.community-request-row small{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+.community-request-row .btn{padding:8px 11px;font-size:10px}
+@media(max-width:650px){.settings-card{padding:17px}.community-request-row{align-items:flex-start;flex-direction:column}.community-request-row>div:last-child{display:flex;gap:7px}}
