@@ -38,23 +38,20 @@
   <div class="layout hidden">
     <aside class="sidebar">
       <div class="side-label">MENÜ</div>
-      <button class="nav-item active" data-view="feed"><span>⌂</span> Akış</button>
-      <button class="nav-item" data-view="explore"><span>⌕</span> Keşfet</button>
+      <button class="nav-item active" data-view="home"><span>⌂</span> Ana sayfa</button>
       <button class="nav-item" data-view="communities"><span>◈</span> Topluluklar</button>
-      <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button><button class="nav-item" data-view="settings"><span>⚙</span> Ayarlar</button><button class="nav-item hidden" id="admin-nav" data-view="admin"><span>♛</span> Kurucu Paneli</button>
+      <button class="nav-item" data-view="friends"><span>♧</span> Arkadaşlar</button>
+      <button class="nav-item" data-view="messages"><span>✉</span> Mesajlar</button>
+      <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button><button class="nav-item" data-view="settings"><span>⚙</span> Hesap</button><button class="nav-item hidden" id="admin-nav" data-view="admin"><span>♛</span> Kurucu Paneli</button>
       <div class="side-card"><div class="side-orb">✦</div><strong>Birlikte daha güçlüyüz.</strong><p>İlgi alanlarını paylaş, yeni insanlarla tanış.</p></div>
       <div class="side-foot">NEXORA <span>EARLY ACCESS</span><small>© 2026 NEXORA</small></div>
     </aside>
     <main class="main">
-      <section id="view-feed" class="view active">
-        <div class="page-heading"><div><div class="eyebrow">TOPLULUĞUN NABZI</div><h1>Akış<span class="gradient-text">.</span></h1><p>Topluluklardan en yeni paylaşımlar.</p></div><button class="btn btn-quiet" id="refresh-feed">↻ Yenile</button></div>
-        <div class="card feed-community-note"><span>◈</span><div><strong>Paylaşımlar topluluklarda yapılır.</strong><p>Metin, fotoğraf ve sesli mesaj göndermek için katıldığın bir topluluğu aç.</p></div></div>
-        <div id="feed-list" class="feed-list"><div class="loading">Akış yükleniyor<span>...</span></div></div>
-      </section>
-      <section id="view-explore" class="view">
-        <div class="page-heading"><div><div class="eyebrow">YENİ ŞEYLER BUL</div><h1>Keşfet<span class="gradient-text">.</span></h1><p>Yeni fikirler ve topluluklar seni bekliyor.</p></div></div>
-        <div class="card explore-banner"><div><div class="eyebrow">NEXORA DISCOVERY</div><h2>Merak ettiğin şeyin<br><span class="gradient-text">peşinden git.</span></h2><p>İlgi alanlarına göre toplulukları keşfet ve sohbete katıl.</p><button class="btn btn-primary" data-go="communities">Toplulukları keşfet ↗</button></div><div class="orbit-art"><span>✦</span><i></i><b></b></div></div>
-        <h2 class="section-title">Son paylaşımlar</h2><div id="explore-feed" class="feed-list"></div>
+      <section id="view-home" class="view active">
+        <div class="home-hero"><div class="eyebrow">YENİ NESİL TOPLULUK PLATFORMU</div><h1>NEXORA<span class="gradient-text">.</span></h1><p>İlgi alanlarını keşfet. Topluluğunu bul. İnsanlarla bağlantı kur.</p><div class="home-hero-actions"><button class="btn btn-primary" data-go="communities">Toplulukları keşfet ↗</button><button class="btn btn-quiet" data-go="friends">Arkadaşlarını bul</button></div></div>
+        <div class="section-row"><h2 class="section-title">Toplulukları keşfet</h2><button class="text-link" data-go="communities">Tümünü gör ↗</button></div>
+        <div id="home-community-list" class="community-grid"><div class="loading">Topluluklar yükleniyor...</div></div>
+        <div class="home-friends-strip card"><div><div class="eyebrow">BAĞLANTILAR</div><h2>Yeni insanlarla tanış.</h2><p>Arkadaşlarını ekle ve onlarla özel mesajlaş.</p></div><button class="btn btn-primary" data-go="friends">Arkadaş ekle +</button></div>
       </section>
       <section id="view-communities" class="view">
         <div class="page-heading"><div><div class="eyebrow">AYNI FREKANSTA BULUŞ</div><h1>Topluluklar<span class="gradient-text">.</span></h1><p>İlgini çeken topluluklara katıl veya kendi alanını oluştur.</p></div></div>
@@ -66,24 +63,42 @@
         <div class="card room-shell">
           <div id="room-messages" class="room-messages"><div class="loading">Mesajlar yükleniyor...</div></div>
           <form id="room-form" class="room-compose">
-            <textarea id="room-message" maxlength="1200" placeholder="Topluluğa bir mesaj yaz..." aria-label="Mesaj"></textarea>
+            <div class="room-input-row"><textarea id="room-message" maxlength="1200" placeholder="Topluluğa bir mesaj yaz..." aria-label="Mesaj"></textarea><button type="submit" class="icon-action send-action" aria-label="Mesaj gönder" title="Gönder">➤</button></div>
             <div class="room-compose-actions">
-              <label class="btn btn-quiet room-attach" for="room-file">＋ Fotoğraf / Ses</label>
+              <label class="icon-action" for="room-file" aria-label="Dosya ekle" title="Dosya ekle">📎</label>
               <input id="room-file" type="file" accept="image/jpeg,image/png,image/webp,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav" hidden>
-              <button type="button" class="btn btn-quiet" id="record-audio">● Ses kaydet</button>
-              <span id="record-status" class="muted"></span>
-              <button type="submit" class="btn btn-primary">Gönder ↗</button>
+              <button type="button" class="icon-action" id="record-audio" aria-label="Ses kaydet" title="Ses kaydet">🎙</button>
+              <span id="record-status" class="muted"></span><span id="room-file-name" class="muted"></span>
             </div>
           </form>
         </div>
       </section>
+      <section id="view-friends" class="view">
+        <div class="page-heading"><div><div class="eyebrow">BAĞLANTILARIN</div><h1>Arkadaşlar<span class="gradient-text">.</span></h1><p>Kullanıcı ara, istek gönder ve bağlantı kur.</p></div></div>
+        <div class="card friends-search-card"><label for="friend-search">Kullanıcı adıyla ara</label><div class="friends-search-row"><input id="friend-search" maxlength="24" placeholder="örn. nexora_user"><button id="friend-search-btn" class="btn btn-primary" type="button">Ara</button></div><div id="friend-search-results"></div></div>
+        <div class="card friends-panel"><h2>Gelen istekler</h2><div id="friend-incoming"><div class="loading">Yükleniyor...</div></div></div>
+        <div class="card friends-panel"><h2>Gönderdiğim istekler</h2><div id="friend-outgoing"><div class="loading">Yükleniyor...</div></div></div>
+        <div class="card friends-panel"><h2>Arkadaşların</h2><div id="friend-list"><div class="loading">Yükleniyor...</div></div></div>
+      </section>
+      <section id="view-messages" class="view">
+        <div class="page-heading"><div><div class="eyebrow">ÖZEL SOHBETLER</div><h1>Mesajlar<span class="gradient-text">.</span></h1><p>Yalnızca arkadaşlarınla özel mesajlaş.</p></div></div>
+        <div class="dm-layout card"><aside id="dm-conversations" class="dm-conversations"><div class="loading">Sohbetler yükleniyor...</div></aside><section class="dm-thread"><div id="dm-thread-head" class="dm-thread-head">Bir arkadaş seç</div><div id="dm-thread-messages" class="dm-thread-messages"><div class="room-empty">Mesajlaşmaya başlamak için soldan bir arkadaş seç.</div></div><form id="dm-form" class="dm-compose"><input id="dm-input" maxlength="2000" placeholder="Mesajını yaz..." disabled><button id="dm-send" class="icon-action send-action" type="submit" aria-label="Mesaj gönder" disabled>➤</button></form></section></div>
+      </section>
       <section id="view-profile" class="view">
         <div class="page-heading"><div><div class="eyebrow">SENİN ALANIN</div><h1>Profilim<span class="gradient-text">.</span></h1><p>Topluluğa kendini tanıt.</p></div></div>
-        <form id="profile-form" class="card profile-card"><div class="profile-avatar-wrap"><div class="profile-avatar" id="profile-avatar">N</div><img id="profile-avatar-image" class="profile-avatar-image hidden" alt="Profil fotoğrafı"><label class="btn btn-quiet avatar-upload-label" for="avatar-file">Fotoğraf yükle</label><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><small>JPG, PNG veya WebP - En fazla 5 MB</small></div><div class="profile-fields"><label>Kullanıcı adı<input id="profile-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" required></label><label>Görünen ad<input id="profile-display" maxlength="40" required></label><label>Biyografi<textarea id="profile-bio" maxlength="160" placeholder="Kendinden biraz bahset..."></textarea></label><button class="btn btn-primary" type="submit">Profili kaydet</button></div></form>
+        <form id="profile-form" class="card profile-card"><div class="profile-avatar-wrap"><div class="profile-avatar" id="profile-avatar">N</div><img id="profile-avatar-image" class="profile-avatar-image hidden" alt="Profil fotoğrafı"><label class="btn btn-quiet avatar-upload-label" for="avatar-file">Fotoğraf yükle</label><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><small>JPG, PNG veya WebP - En fazla 5 MB</small></div><div class="profile-fields"><label>Görünen ad<input id="profile-display" maxlength="40" required></label><label>Biyografi<textarea id="profile-bio" maxlength="160" placeholder="Kendinden biraz bahset..."></textarea></label><button class="btn btn-primary" type="submit">Profili kaydet</button></div></form>
         <div class="card profile-note"><span>✦</span><div><strong>Profilin senin dijital alanın.</strong><p>Kullanıcı adın ve biyografin herkese açık profilinde görüntülenir. E-posta adresin paylaşılmaz.</p></div></div>
       </section>
       <section id="view-settings" class="view">
-        <div class="page-heading"><div><div class="eyebrow">HESAP GÜVENLİĞİ</div><h1>Ayarlar<span class="gradient-text">.</span></h1><p>Hesabını ve giriş güvenliğini yönet.</p></div></div>
+        <div class="page-heading"><div><div class="eyebrow">HESAP MERKEZİ</div><h1>Hesap<span class="gradient-text">.</span></h1><p>Kullanıcı adını ve giriş güvenliğini yönet.</p></div></div>
+        <form id="username-change-form" class="card settings-card username-settings-card">
+          <div class="settings-card-heading"><span class="settings-icon">＠</span><div><div class="eyebrow">KULLANICI ADI</div><h2>Kullanıcı adını değiştir</h2><p>Güvenlik için mevcut şifren istenir. Kullanıcı adını 7 günde bir değiştirebilirsin.</p></div></div>
+          <label>Yeni kullanıcı adı<input id="new-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" autocomplete="username" required placeholder="yeni_kullanici_adi"></label>
+          <label>Mevcut şifren<input id="username-current-password" type="password" autocomplete="current-password" required></label>
+          <div id="username-change-message" class="form-message" role="status"></div>
+          <button class="btn btn-primary" type="submit">Kullanıcı adını güncelle</button>
+          <small id="username-change-limit" class="settings-help">Kullanıcı adı değişikliği 7 günde bir yapılabilir.</small>
+        </form>
         <form id="password-change-form" class="card settings-card">
           <div><div class="eyebrow">ŞİFRE GÜVENLİĞİ</div><h2>Şifre değiştir</h2><p>Değişiklik için mevcut şifreni doğrulaman gerekir.</p></div>
           <label>Mevcut şifre<input id="current-password" type="password" autocomplete="current-password" required></label>
