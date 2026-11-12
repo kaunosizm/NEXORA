@@ -44,6 +44,8 @@
   document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
   document.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => setView(b.dataset.go)));
   $("auth-open").addEventListener("click", () => showAuth("login"));
+  $("welcome-login").addEventListener("click", () => showAuth("login"));
+  $("welcome-register").addEventListener("click", () => showAuth("signup"));
   $("auth-close").addEventListener("click", () => $("auth-dialog").close());
   $("auth-switch").addEventListener("click", () => showAuth(authMode === "signup" ? "login" : "signup"));
   $("refresh-feed").addEventListener("click", loadFeed);
@@ -156,7 +158,9 @@
   }
   async function updateAuth(session) {
     user = session?.user || null;
-    $("auth-open").classList.toggle("hidden",!!user); $("user-chip").classList.toggle("hidden",!user);
+    $("welcome-screen").classList.toggle("hidden",!!user);
+    document.querySelector(".layout").classList.toggle("hidden",!user);
+    $("auth-open").classList.add("hidden"); $("user-chip").classList.toggle("hidden",!user);
     if (user) {
       const {data} = await db.from("profiles").select("username,display_name").eq("id",user.id).maybeSingle();
       profile = data; $("user-chip").textContent = "@"+(data?.username || "üye");
