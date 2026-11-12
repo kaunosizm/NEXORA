@@ -84,17 +84,15 @@ grant delete on public.community_members to authenticated;
 drop policy if exists "Users join public communities or claim ownership of their own" on public.community_members;
 create policy "Users join public communities or claim ownership of their own" on public.community_members for insert to authenticated with check (
   (
-    user_id=(select auth.uid()) and (
+    (user_id=(select auth.uid()) and (
       (role='member' and exists(select 1 from public.communities c where c.id=community_id and c.visibility='public'))
       or (role='owner' and exists(select 1 from public.communities c where c.id=community_id and c.created_by=(select auth.uid())))
-    )
+    ))
+    or (role='member' and exists(select 1 from public.communities c where c.id=community_id and c.created_by=(select auth.uid())))
   )
   and not exists(select 1 from public.community_moderation_actions a
     where a.community_id=community_members.community_id and a.target_user_id=(select auth.uid())
       and a.action_type='ban' and (a.expires_at is null or a.expires_at>now()))
-  or (
-    role='member' and exists(select 1 from public.communities c where c.id=community_id and c.created_by=(select auth.uid()))
-  )
 );
 
 create or replace function public.community_moderate_member(
