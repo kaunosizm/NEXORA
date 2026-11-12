@@ -106,3 +106,17 @@ begin
   end if;
 end;
 $$;
+
+
+-- Private community join requests and member-only private content.
+create table if not exists public.community_join_requests (
+  id uuid primary key default gen_random_uuid(),
+  community_id uuid not null references public.communities(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  unique (community_id,user_id)
+);
+create index if not exists community_join_requests_owner_idx on public.community_join_requests(community_id,status,created_at);
+alter table public.community_join_requests enable row level security;
