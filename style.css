@@ -232,3 +232,14 @@
   .nav-item{flex:1;min-width:0;padding:8px 2px;font-size:8px;white-space:nowrap}
   .nav-item span{width:auto;font-size:17px}
 }
+
+
+/* Keep the top-left NEXORA mark vertically aligned with the header. */
+.topbar{display:flex;align-items:center;min-height:76px}
+.topbar>.brand{align-self:center;position:relative;top:-3px;margin:0;line-height:1;flex-shrink:0}
+.topbar>.brand .brand-mark{display:grid;place-items:center;flex:0 0 34px;line-height:1}
+.topbar>.top-actions{align-self:center}
+@media(max-width:700px){
+ .topbar{min-height:65px;height:65px}
+ .topbar>.brand{top:-2px}
+}
