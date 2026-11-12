@@ -55,3 +55,54 @@ grant insert,update,delete on public.posts to authenticated;
 grant insert,update,delete on public.comments to authenticated;
 grant insert,delete on public.post_likes to authenticated;
 grant all on table public.profiles,public.communities,public.community_members,public.posts,public.comments,public.post_likes to service_role;
+
+
+-- Additional hardening and foreign-key indexes added after the initial deployment.
+create index if not exists comments_author_id_idx on public.comments(author_id);
+create index if not exists communities_created_by_idx on public.communities(created_by);
+
+drop policy if exists "Authors update their own posts" on public.posts;
+create policy "Authors update their own posts" on public.posts
+for update to authenticated
+using (author_id = (select auth.uid()))
+with check (
+  author_id = (select auth.uid())
+  and (
+    community_id is null
+    or exists (
+      select 1 from public.community_members m
+      where m.community_id = posts.community_id
+        and m.user_id = (select auth.uid())
+    )
+  )
+);
+
+drop policy if exists "Authors update their own comments" on public.comments;
+create policy "Authors update their own comments" on public.comments
+for update to authenticated
+using (author_id = (select auth.uid()))
+with check (
+  author_id = (select auth.uid())
+  and exists (select 1 from public.posts p where p.id = post_id)
+);
+
+drop policy if exists "Likes are readable" on public.post_likes;
+create policy "Likes on visible posts are readable" on public.post_likes
+for select to anon, authenticated
+using (exists (select 1 from public.posts p where p.id = post_id));
+
+drop policy if exists "Users like as themselves" on public.post_likes;
+create policy "Users like visible posts as themselves" on public.post_likes
+for insert to authenticated
+with check (
+  user_id = (select auth.uid())
+  and exists (select 1 from public.posts p where p.id = post_id)
+);
+
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    execute 'revoke all on function public.rls_auto_enable() from public, anon, authenticated';
+  end if;
+end;
+$$;
