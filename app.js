@@ -136,6 +136,29 @@
   $("sidebar-logout").addEventListener("click",async()=>{if(user&&confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}});
 
   let globalSearchType="all",globalSearchTimer=null;
+  async function showProfileCard(profileId){
+    if(!profileId)return;
+    const box=$("profile-view-content");
+    box.innerHTML='<div class="loading">Profil yükleniyor...</div>';
+    $("profile-view-dialog").showModal();
+    const {data:p,error}=await db.from("profiles").select("id,username,display_name,bio,avatar_url,created_at").eq("id",profileId).maybeSingle();
+    if(error||!p){box.innerHTML='<p class="empty-note">Profil yüklenemedi.</p>';return;}
+    let friendship="none";
+    if(user&&user.id!==p.id){
+      const [f,r]=await Promise.all([
+        db.from("friendships").select("user_a,user_b").or("and(user_a.eq."+user.id+",user_b.eq."+p.id+"),and(user_a.eq."+p.id+",user_b.eq."+user.id+")"),
+        db.from("friend_requests").select("sender_id,receiver_id,status").eq("status","pending").or("and(sender_id.eq."+user.id+",receiver_id.eq."+p.id+"),and(sender_id.eq."+p.id+",receiver_id.eq."+user.id+")")
+      ]);
+      if(f.data?.length)friendship="friends";
+      else if(r.data?.length)friendship=r.data[0].sender_id===user.id?"sent":"received";
+    }
+    const avatar=p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase());
+    const action=user&&user.id!==p.id?(friendship==="friends"?'<button class="btn btn-primary" data-profile-message="'+p.id+'">Mesaj gönder</button>':friendship==="sent"?'<span class="request-pending">İstek gönderildi</span>':friendship==="received"?'<span class="request-pending">Sana istek gönderdi</span>':'<button class="btn btn-primary" data-profile-add="'+p.id+'">Arkadaş ekle +</button>'):"";
+    box.innerHTML='<div class="profile-view-hero"><div class="profile-view-avatar">'+avatar+'</div><div><div class="eyebrow">NEXORA PROFİLİ</div><h2>'+esc(p.display_name||p.username)+'</h2><p>@'+esc(p.username)+'</p></div></div><div class="profile-view-bio">'+esc(p.bio||"Bu kullanıcı henüz bir biyografi eklememiş.")+'</div><div class="profile-view-meta"><span>Katılma tarihi</span><strong>'+esc(when(p.created_at))+'</strong></div><div class="profile-view-actions">'+action+'</div>';
+    box.querySelector("[data-profile-add]")?.addEventListener("click",async()=>{const r=await db.from("friend_requests").insert({sender_id:user.id,receiver_id:p.id});if(r.error)return toast(r.error.message);toast("Arkadaşlık isteği gönderildi.");showProfileCard(p.id);loadFriends();});
+    box.querySelector("[data-profile-message]")?.addEventListener("click",async()=>{$("profile-view-dialog").close();setView("messages");await openDm(p);});
+  }
+  document.addEventListener("click",e=>{const el=e.target.closest("[data-profile-view]");if(el){e.preventDefault();showProfileCard(el.dataset.profileView);}});
   $("global-search-open").addEventListener("click",()=>{$("global-search-dialog").showModal();$("global-search-input").focus();});
   $("global-search-close").addEventListener("click",()=>$("global-search-dialog").close());
   $("global-search-dialog").addEventListener("click",e=>{if(e.target===$("global-search-dialog"))$("global-search-dialog").close();});
