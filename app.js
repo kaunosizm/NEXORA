@@ -16,7 +16,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -37,10 +37,12 @@
   const setView = (name) => {
     document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
+    if (name === "home") loadHome();
     if (name === "communities") loadCommunities();
+    if (name === "friends") loadFriends();
+    if (name === "messages") loadMessages();
     if (name === "profile") loadProfile();
     if (name === "settings") loadSettings();
-    if (name === "explore") loadExplore();
     if (name === "admin") loadAdmin();
     window.scrollTo({top:0,behavior:"smooth"});
   };
@@ -51,7 +53,6 @@
   $("welcome-register").addEventListener("click", () => showAuth("signup"));
   $("auth-close").addEventListener("click", () => $("auth-dialog").close());
   $("auth-switch").addEventListener("click", () => showAuth(authMode === "signup" ? "login" : "signup"));
-  $("refresh-feed").addEventListener("click", loadFeed);
   $("password-change-form").addEventListener("submit", async (e) => {
     e.preventDefault(); if (!requireUser()) return;
     const currentPassword=$("current-password").value;
@@ -62,7 +63,7 @@
     if(newPassword!==confirmPassword){message.textContent="Yeni şifreler eşleşmiyor.";return;}
     const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;message.textContent="Şifre doğrulanıyor...";
     try{
-      const {error}=await db.auth.updateUser({password:newPassword,currentPassword});
+      const {error}=await db.auth.updateUser({password:newPassword,current_password:currentPassword});
       if(error)throw error;
       e.currentTarget.reset();message.textContent="Şifren başarıyla güncellendi.";toast("Şifren güncellendi.");
     }catch(err){message.textContent=err.message||"Şifre güncellenemedi.";}
@@ -148,11 +149,26 @@
   });
   $("profile-form").addEventListener("submit", async (e) => {
     e.preventDefault(); if (!requireUser()) return;
-    const username = $("profile-username").value.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,24}$/.test(username)) return toast("Kullanıcı adı 3-24 karakter olmalı.");
-    const {error} = await db.from("profiles").update({username,display_name:$("profile-display").value.trim(),bio:$("profile-bio").value.trim()}).eq("id",user.id);
+    const {error} = await db.from("profiles").update({display_name:$("profile-display").value.trim(),bio:$("profile-bio").value.trim()}).eq("id",user.id);
     if (error) return toast(error.message);
     await loadProfile(); toast("Profilin kaydedildi.");
+  });
+  $("username-change-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!requireUser())return;
+    const next=$("new-username").value.trim().toLowerCase(),password=$("username-current-password").value,message=$("username-change-message");
+    if(!/^[a-z0-9_]{3,24}$/.test(next)){message.textContent="3-24 karakter kullan; yalnızca harf, sayı ve _ olabilir.";return;}
+    if(next===profile?.username){message.textContent="Bu zaten mevcut kullanıcı adın.";return;}
+    if(!user.email){message.textContent="Hesap e-posta bilgisi alınamadı.";return;}
+    const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;message.textContent="Şifren doğrulanıyor...";
+    try{
+      const auth=await db.auth.signInWithPassword({email:user.email,password});if(auth.error)throw new Error("Mevcut şifren doğru değil.");
+      const changed=await db.rpc("change_username",{p_username:next});if(changed.error)throw changed.error;
+      const refreshed=await db.from("profiles").select("id,username,display_name").eq("id",user.id).single();if(refreshed.error)throw refreshed.error;
+      profile={...profile,username:refreshed.data.username};
+      $("user-chip").innerHTML=refreshed.data.id===FOUNDER_UID?'<span class="founder-name">@'+esc(refreshed.data.username)+'</span> <span class="founder-badge">♛</span>':"@"+esc(refreshed.data.username);
+      $("username-current-password").value="";message.textContent="Kullanıcı adın güncellendi.";toast("Kullanıcı adın değiştirildi.");await loadProfile();await loadSettings();
+    }catch(err){message.textContent=err.message||"Kullanıcı adı değiştirilemedi.";}
+    finally{button.disabled=false;}
   });
   $("community-form").addEventListener("submit", async (e) => {
     e.preventDefault(); if (!requireUser()) return;
@@ -166,11 +182,10 @@
     e.target.reset(); toast("Topluluğun oluşturuldu!"); await loadCommunities();
   });
   async function loadProfile() {
-    if (!user) { $("profile-username").value=""; $("profile-display").value=""; $("profile-bio").value=""; return; }
-    const {data,error} = await db.from("profiles").select("username,display_name,bio,avatar_url").eq("id",user.id).maybeSingle();
+    if (!user) { $("profile-display").value=""; $("profile-bio").value=""; return; }
+    const {data,error} = await db.from("profiles").select("username,display_name,bio,avatar_url,username_changed_at").eq("id",user.id).maybeSingle();
     if (error) return toast(error.message);
     profile = data; if (!data) return;
-    $("profile-username").value = data.username || "";
     $("profile-display").value = data.display_name || "";
     $("profile-bio").value = data.bio || "";
     $("profile-avatar").textContent = (data.display_name || data.username || "N").slice(0,1).toUpperCase();
@@ -205,22 +220,14 @@
       });
     });
   }
-  async function loadFeed() {
-    $("feed-list").innerHTML = '<div class="loading">Akış yükleniyor...</div>';
-    try { const posts = await fetchPosts(); $("feed-list").innerHTML = posts.length ? posts.map(postMarkup).join("") : '<div class="card loading">Henüz paylaşım yok. İlk gönderiyi sen paylaş!</div>'; bindPostActions($("feed-list")); $("side-post-count").textContent = posts.length; }
-    catch (err) { $("feed-list").innerHTML = '<div class="card loading">Akış yüklenemedi: '+esc(err.message)+'</div>'; }
-  }
-  async function loadExplore() {
-    try { const posts = await fetchPosts(); $("explore-feed").innerHTML = posts.length ? posts.slice(0,12).map(postMarkup).join("") : '<div class="card loading">Keşfedilecek ilk paylaşımı sen yap!</div>'; bindPostActions($("explore-feed")); }
-    catch (err) { $("explore-feed").innerHTML = '<div class="loading">'+esc(err.message)+'</div>'; }
-  }
-  async function loadCommunities() {
-    $("community-list").innerHTML = '<div class="loading">Topluluklar yükleniyor...</div>';
-    const {data,error} = await db.from("communities").select("id,name,slug,description,created_at,created_by,visibility").order("created_at",{ascending:false}).limit(60);
-    if (error) { $("community-list").innerHTML = '<div class="loading">'+esc(error.message)+'</div>'; return; }
-    $("community-count").textContent = (data||[]).length+" topluluk";
-    $("side-community-count").textContent = (data||[]).length;
-    if (!data?.length) { $("community-list").innerHTML = '<div class="card loading">Henüz topluluk yok. İlk topluluğu sen oluştur!</div>'; return; }
+  async function loadHome(){await loadCommunities("home-community-list");}
+  async function loadCommunities(targetId="community-list") {
+    const listBox=$(targetId);if(!listBox)return;
+    listBox.innerHTML = '<div class="loading">Topluluklar yükleniyor...</div>';
+    const {data,error} = await db.from("communities").select("id,name,slug,description,created_at,created_by,visibility").order("created_at",{ascending:false}).limit(targetId==="home-community-list"?4:60);
+    if (error) { listBox.innerHTML = '<div class="loading">'+esc(error.message)+'</div>'; return; }
+    if(targetId==="community-list")$("community-count").textContent = (data||[]).length+" topluluk";
+    if (!data?.length) { listBox.innerHTML = '<div class="card loading">Henüz topluluk yok. İlk topluluğu sen oluştur!</div>'; return; }
     let joined = new Set();
     let ownRequests=new Map();
     let pendingRequests=[];
@@ -234,24 +241,25 @@
       ownRequests=new Map((ownResult.data||[]).map(r=>[r.community_id,r.status]));
       pendingRequests=ownerResult.data||[];
     }
-    $("community-list").innerHTML = data.map((c,i)=>{
+    listBox.innerHTML = data.map((c,i)=>{
       const isPrivate=c.visibility==="private";
       const action=joined.has(c.id)?`<button class="btn btn-primary" data-open-community="${c.id}">Topluluğu aç ↗</button>`:
         (isPrivate?(ownRequests.has(c.id)?`<button class="btn btn-quiet" disabled>${ownRequests.get(c.id)==="pending"?"İstek gönderildi":"İstek: "+(ownRequests.get(c.id)==="approved"?"onaylandı":"reddedildi")}</button>`:`<button class="btn btn-quiet" data-request="${c.id}">Katılma isteği gönder</button>`):`<button class="btn btn-quiet" data-join="${c.id}">Topluluğa katıl +</button>`);
       return `<article class="card community-card"><div class="community-symbol">${["✦","◈","⌘","✧"][i%4]}</div><div class="community-visibility">${isPrivate?"🔒 GİZLİ":"● HERKESE AÇIK"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${action}</div></article>`;
     }).join("");
-    $("community-list").querySelectorAll("[data-open-community]").forEach(btn=>btn.addEventListener("click",()=>openCommunity(data.find(c=>c.id===btn.dataset.openCommunity))));
-    $("community-list").querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
+    listBox.querySelectorAll("[data-open-community]").forEach(btn=>btn.addEventListener("click",()=>openCommunity(data.find(c=>c.id===btn.dataset.openCommunity))));
+    listBox.querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return; const {error:joinError}=await db.from("community_members").insert({community_id:btn.dataset.join,user_id:user.id,role:"member"});
       if(joinError && !joinError.message.includes("duplicate"))return toast(joinError.message);
       toast("Topluluğa katıldın!"); loadCommunities();
     }));
-    $("community-list").querySelectorAll("[data-request]").forEach(btn=>btn.addEventListener("click",async()=>{
+    listBox.querySelectorAll("[data-request]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return;
       const {error:requestError}=await db.from("community_join_requests").insert({community_id:btn.dataset.request,user_id:user.id,status:"pending"});
       if(requestError)return toast(requestError.message);
       toast("Katılma isteğin gönderildi.");loadCommunities();
     }));
+    if(targetId==="home-community-list")return;
     const requestBox=$("community-requests");
     requestBox.classList.toggle("hidden",!pendingRequests.length);
     $("community-request-list").innerHTML=pendingRequests.map(r=>`<div class="community-request-row"><div><strong>${esc(r.profiles?.display_name||r.profiles?.username||"Üye")}</strong><small>@${esc(r.profiles?.username||"üye")} · ${esc(r.communities?.name||"Topluluk")}</small></div><div><button class="btn btn-primary" data-approve-request="${r.id}">Onayla</button> <button class="btn btn-quiet" data-reject-request="${r.id}">Reddet</button></div></div>`).join("");
@@ -268,15 +276,44 @@
       if(updated.error)return toast(updated.error.message);toast("İstek reddedildi.");loadCommunities();
     }));
   }
-  async function loadSettings(){
-    if(!user)return;
-    const {data,error}=await db.auth.mfa.listFactors();
-    if(error){$("mfa-status").textContent="2FA durumu alınamadı: "+error.message;return;}
-    const verified=(data?.totp||[]).filter(f=>f.status==="verified");
-    $("mfa-status").textContent=verified.length?"● İki faktörlü doğrulama etkin":"○ İki faktörlü doğrulama kapalı";
-    $("mfa-start").classList.toggle("hidden",verified.length>0);
-    $("mfa-disable").classList.toggle("hidden",verified.length===0);
+  async function findProfiles(ids){const clean=[...new Set(ids.filter(Boolean))];if(!clean.length)return [];const {data,error}=await db.from("profiles").select("id,username,display_name,avatar_url").in("id",clean);if(error)throw error;return data||[];}
+  async function loadFriends(){
+    if(!user)return;const results=await Promise.all([db.from("friend_requests").select("id,sender_id").eq("receiver_id",user.id).eq("status","pending"),db.from("friend_requests").select("id,receiver_id").eq("sender_id",user.id).eq("status","pending"),db.from("friendships").select("user_a,user_b").or("user_a.eq."+user.id+",user_b.eq."+user.id)]);
+    const [incoming,outgoing,links]=results;if(results.some(r=>r.error)){toast(results.find(r=>r.error).error.message);return;}
+    const ids=[...(incoming.data||[]).map(r=>r.sender_id),...(outgoing.data||[]).map(r=>r.receiver_id),...(links.data||[]).map(r=>r.user_a===user.id?r.user_b:r.user_a)],people=await findProfiles(ids),byId=new Map(people.map(p=>[p.id,p]));
+    const render=p=>'<strong>'+esc(p?.display_name||p?.username||"Üye")+'</strong><small>@'+esc(p?.username||"uye")+'</small>';
+    $("friend-incoming").innerHTML=incoming.data?.length?incoming.data.map(r=>'<div class="friend-row"><div class="friend-person">'+render(byId.get(r.sender_id))+'</div><div class="friend-actions"><button class="btn btn-primary" data-accept="'+r.id+'">Kabul et</button><button class="btn btn-quiet" data-reject="'+r.id+'">Reddet</button></div></div>').join(""):'<p class="empty-note">Bekleyen istek yok.</p>';
+    $("friend-outgoing").innerHTML=outgoing.data?.length?outgoing.data.map(r=>'<div class="friend-row"><div class="friend-person">'+render(byId.get(r.receiver_id))+'</div><span class="request-pending">İstek gönderildi</span></div>').join(""):'<p class="empty-note">Gönderdiğin istek yok.</p>';
+    $("friend-list").innerHTML=links.data?.length?links.data.map(r=>{const id=r.user_a===user.id?r.user_b:r.user_a;return '<div class="friend-row"><div class="friend-person">'+render(byId.get(id))+'</div><button class="btn btn-primary" data-open-dm="'+id+'">Mesaj gönder</button></div>';}).join(""):'<p class="empty-note">Henüz arkadaşın yok. Yukarıdan kullanıcı ara.</p>';
+    $("friend-incoming").querySelectorAll("[data-accept]").forEach(b=>b.addEventListener("click",async()=>{const r=await db.rpc("accept_friend_request",{p_request_id:b.dataset.accept});if(r.error)return toast(r.error.message);toast("Arkadaşlık isteği kabul edildi.");loadFriends();}));
+    $("friend-incoming").querySelectorAll("[data-reject]").forEach(b=>b.addEventListener("click",async()=>{const r=await db.from("friend_requests").update({status:"rejected"}).eq("id",b.dataset.reject);if(r.error)return toast(r.error.message);loadFriends();}));
+    $("friend-list").querySelectorAll("[data-open-dm]").forEach(b=>b.addEventListener("click",async()=>{const p=byId.get(b.dataset.openDm);if(p){setView("messages");await openDm(p);}}));
   }
+  async function searchFriends(){
+    if(!requireUser())return;const term=$("friend-search").value.trim().replace(/^@/,"").toLowerCase();if(term.length<3){$("friend-search-results").textContent="En az 3 karakter yaz.";return;}
+    const {data,error}=await db.from("profiles").select("id,username,display_name").ilike("username",term+"%").neq("id",user.id).limit(12);if(error){$("friend-search-results").textContent=error.message;return;}if(!data?.length){$("friend-search-results").textContent="Kullanıcı bulunamadı.";return;}
+    const [l,r]=await Promise.all([db.from("friendships").select("user_a,user_b").or("user_a.eq."+user.id+",user_b.eq."+user.id),db.from("friend_requests").select("sender_id,receiver_id").eq("status","pending").or("sender_id.eq."+user.id+",receiver_id.eq."+user.id)]);
+    const friends=new Set((l.data||[]).map(x=>x.user_a===user.id?x.user_b:x.user_a)),pending=new Set((r.data||[]).map(x=>x.sender_id===user.id?x.receiver_id:x.sender_id));
+    $("friend-search-results").innerHTML=data.map(p=>'<div class="friend-row"><div class="friend-person"><strong>'+esc(p.display_name||p.username)+'</strong><small>@'+esc(p.username)+'</small></div>'+(friends.has(p.id)?'<span class="request-pending">Arkadaşsınız</span>':pending.has(p.id)?'<span class="request-pending">İstek bekliyor</span>':'<button class="btn btn-quiet" data-add="'+p.id+'">Arkadaş ekle +</button>')+'</div>').join("");
+    $("friend-search-results").querySelectorAll("[data-add]").forEach(b=>b.addEventListener("click",async()=>{const x=await db.from("friend_requests").insert({sender_id:user.id,receiver_id:b.dataset.add});if(x.error)return toast(x.error.message);toast("Arkadaşlık isteği gönderildi.");loadFriends();searchFriends();}));
+  }
+  async function loadMessages(){
+    if(!user)return;const {data:links,error}=await db.from("friendships").select("user_a,user_b").or("user_a.eq."+user.id+",user_b.eq."+user.id);if(error){$("dm-conversations").textContent=error.message;return;}
+    const ids=(links||[]).map(r=>r.user_a===user.id?r.user_b:r.user_a),people=await findProfiles(ids);
+    $("dm-conversations").innerHTML=people.length?people.map(p=>'<button class="dm-contact" data-dm="'+p.id+'"><strong>'+esc(p.display_name||p.username)+'</strong><small>@'+esc(p.username)+'</small></button>').join(""):'<div class="empty-note">Mesajlaşmak için önce arkadaş ekle.</div>';
+    $("dm-conversations").querySelectorAll("[data-dm]").forEach(b=>b.addEventListener("click",()=>openDm(people.find(p=>p.id===b.dataset.dm))));
+    if(activeDm&&ids.includes(activeDm.id))await loadDmMessages();
+    if(!dmChannel)dmChannel=db.channel("nexora-dm-"+user.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"direct_messages"},payload=>{const m=payload.new;if(activeDm&&[m.sender_id,m.receiver_id].includes(activeDm.id))loadDmMessages();}).subscribe();
+  }
+  async function openDm(person){if(!person)return;activeDm=person;$("dm-thread-head").innerHTML='<strong>'+esc(person.display_name||person.username)+'</strong><small>@'+esc(person.username)+'</small>';$("dm-input").disabled=false;$("dm-send").disabled=false;$("dm-conversations").querySelectorAll(".dm-contact").forEach(b=>b.classList.toggle("active",b.dataset.dm===person.id));await loadDmMessages();}
+  async function loadDmMessages(){
+    if(!activeDm||!user)return;const {data,error}=await db.from("direct_messages").select("id,sender_id,content,created_at").or("and(sender_id.eq."+user.id+",receiver_id.eq."+activeDm.id+"),and(sender_id.eq."+activeDm.id+",receiver_id.eq."+user.id+")").order("created_at",{ascending:true}).limit(200);
+    if(error){$("dm-thread-messages").textContent=error.message;return;}
+    $("dm-thread-messages").innerHTML=data?.length?data.map(m=>'<div class="dm-bubble '+(m.sender_id===user.id?'mine':'')+'"><p>'+esc(m.content)+'</p><small>'+esc(when(m.created_at))+'</small></div>').join(""):'<div class="room-empty">Henüz mesaj yok. İlk mesajı gönder!</div>';$("dm-thread-messages").scrollTop=$("dm-thread-messages").scrollHeight;
+  }
+  $("friend-search-btn").addEventListener("click",searchFriends);
+  $("friend-search").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchFriends();}});
+  $("dm-form").addEventListener("submit",async e=>{e.preventDefault();if(!activeDm||!requireUser())return;const content=$("dm-input").value.trim();if(!content)return;$("dm-send").disabled=true;const r=await db.from("direct_messages").insert({sender_id:user.id,receiver_id:activeDm.id,content});$("dm-send").disabled=false;if(r.error)return toast(r.error.message);$("dm-input").value="";await loadDmMessages();});
   async function loadSettings(){
     if(!user)return;
     const {data,error}=await db.auth.mfa.listFactors();
@@ -287,6 +324,16 @@
     $("mfa-status").textContent=verified.length?"● İki faktörlü doğrulama etkin":"○ İki faktörlü doğrulama kapalı";
     $("mfa-start").classList.toggle("hidden",verified.length>0);
     $("mfa-disable").classList.toggle("hidden",verified.length===0);
+    const p=await db.from("profiles").select("username,username_changed_at").eq("id",user.id).single();
+    if(!p.error){
+      $("new-username").value=p.data.username||"";
+      const button=$("username-change-form").querySelector('button[type="submit"]');
+      if(p.data.username_changed_at){
+        const next=new Date(new Date(p.data.username_changed_at).getTime()+7*86400000);
+        if(next>Date.now()){$("username-change-limit").textContent="Sonraki değişiklik: "+next.toLocaleString("tr-TR",{dateStyle:"medium",timeStyle:"short"});button.disabled=true;}
+        else{$("username-change-limit").textContent="Kullanıcı adını şimdi değiştirebilirsin.";button.disabled=false;}
+      }else{$("username-change-limit").textContent="Henüz kullanıcı adı değişikliği yapmadın.";button.disabled=false;}
+    }
   }
   async function updateAuth(session) {
     const revision = ++authRevision;
@@ -327,7 +374,7 @@
       $("user-chip").onclick = async()=>{if(confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}};
     } else { profile=null; $("user-chip").onclick=null; $("admin-nav").classList.add("hidden"); }
     if (revision !== authRevision) return;
-    await Promise.all([loadFeed(),loadCommunities()]);
+    await Promise.all([loadHome(),loadCommunities()]);
   }
   $("avatar-file").addEventListener("change", async (e)=>{
     if(!requireUser())return; const file=e.target.files?.[0]; if(!file)return;
@@ -380,20 +427,20 @@
     }
     const {error}=await db.from("community_messages").insert({community_id:activeCommunity.id,author_id:user.id,message_type,content,media_path});
     if(error)return toast(error.message);
-    $("room-message").value="";$("room-file").value="";if(fileOverride)toast("Sesli mesaj gönderildi.");await loadRoomMessages();
+    $("room-message").value="";$("room-file").value="";$("room-file-name").textContent="";if(fileOverride)toast("Sesli mesaj gönderildi.");await loadRoomMessages();
   }
   $("room-form").addEventListener("submit",async e=>{e.preventDefault();await sendRoomMessage();});
-  $("room-file").addEventListener("change",e=>{if(e.target.files?.[0])toast("Dosya hazır. Göndermek için Gönder'e bas.");});
+  $("room-file").addEventListener("change",e=>{const file=e.target.files?.[0];$("room-file-name").textContent=file?file.name:"";if(file)toast("Dosya eklendi. Uçak simgesine basarak gönder.");});
   $("record-audio").addEventListener("click",async()=>{
     if(!requireUser())return;
-    if(mediaRecorder?.state==="recording"){mediaRecorder.stop();$("record-audio").textContent="● Ses kaydet";$("record-status").textContent="Ses hazırlanıyor...";return;}
+    if(mediaRecorder?.state==="recording"){mediaRecorder.stop();$("record-audio").textContent="🎙";$("record-status").textContent="Ses hazırlanıyor...";return;}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return toast("Bu tarayıcı ses kaydını desteklemiyor.");
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:true});
       mediaRecorder=new MediaRecorder(stream);recordingChunks=[];
       mediaRecorder.ondataavailable=e=>{if(e.data.size)recordingChunks.push(e.data);};
       mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(recordingChunks,{type:mediaRecorder.mimeType||"audio/webm"});const ext=blob.type.includes("ogg")?"ogg":blob.type.includes("mp4")?"m4a":"webm";const voice=new File([blob],"voice-note-"+Date.now()+"."+ext,{type:blob.type});$("record-status").textContent="";await sendRoomMessage(voice);};
-      mediaRecorder.start();$("record-audio").textContent="■ Kaydı bitir";$("record-status").textContent="Ses kaydediliyor...";
+      mediaRecorder.start();$("record-audio").textContent="■";$("record-status").textContent="Ses kaydediliyor...";
     }catch(err){toast("Mikrofon izni alınamadı: "+err.message);}
   });
   async function loadAdmin(){
