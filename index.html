@@ -8,7 +8,7 @@
   <title>NEXORA — Topluluğunu Keşfet</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
@@ -31,9 +31,9 @@
         <button id="welcome-login" class="btn btn-primary">Giriş Yap <b>↗</b></button>
         <button id="welcome-register" class="btn btn-outline">Kayıt Ol</button>
       </div>
-      <div class="welcome-foot"><span>✦</span> Birlikte keşfet. Birlikte üret. Birlikte büyü.</div>
+      <div class="welcome-foot">Birlikte keşfet. Birlikte üret. Birlikte büyü.</div>
     </div>
-    <div class="welcome-art" aria-hidden="true"><div class="welcome-ring ring-one"></div><div class="welcome-ring ring-two"></div><div class="welcome-core">N</div><i class="spark spark-one">✦</i><i class="spark spark-two">✧</i><i class="spark spark-three">·</i></div>
+    <div class="welcome-art" aria-hidden="true"><div class="welcome-ring ring-one"></div><div class="welcome-ring ring-two"></div><div class="welcome-core">N</div></div>
   </section>
   <div class="layout hidden">
     <aside class="sidebar">
@@ -43,7 +43,7 @@
       <button class="nav-item" data-view="friends"><span>♧</span> Arkadaşlar</button>
       <button class="nav-item" data-view="messages"><span>✉</span> Mesajlar</button>
       <button class="nav-item" data-view="profile"><span>◎</span> Profilim</button><button class="nav-item" data-view="settings"><span>⚙</span> Hesap</button><button class="nav-item hidden" id="admin-nav" data-view="admin"><span>♛</span> Kurucu Paneli</button>
-      <div class="side-card"><div class="side-orb">✦</div><strong>Birlikte daha güçlüyüz.</strong><p>İlgi alanlarını paylaş, yeni insanlarla tanış.</p></div>
+      <div class="side-card"><div class="side-orb">N</div><strong>Birlikte daha güçlüyüz.</strong><p>İlgi alanlarını paylaş, yeni insanlarla tanış.</p></div>
       <div class="sidebar-profile" id="sidebar-profile"><div class="sidebar-profile-avatar" id="sidebar-profile-avatar">N</div><div class="sidebar-profile-copy"><strong id="sidebar-profile-name">Profil</strong><small id="sidebar-profile-username">@kullanıcı</small></div><button id="sidebar-logout" type="button" title="Çıkış yap">↗</button></div><div class="side-foot">NEXORA <span>EARLY ACCESS</span><small>© 2026 NEXORA</small></div>
     </aside>
     <main class="main">
@@ -106,10 +106,26 @@
       <section id="view-profile" class="view">
         <div class="page-heading"><div><div class="eyebrow">SENİN ALANIN</div><h1>Profilim<span class="gradient-text">.</span></h1><p>Topluluğa kendini tanıt.</p></div></div>
         <form id="profile-form" class="card profile-card"><div class="profile-avatar-wrap"><div class="profile-avatar" id="profile-avatar">N</div><img id="profile-avatar-image" class="profile-avatar-image hidden" alt="Profil fotoğrafı"><label class="btn btn-quiet avatar-upload-label" for="avatar-file">Fotoğraf yükle</label><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><small>JPG, PNG veya WebP - En fazla 5 MB</small></div><div class="profile-fields"><label>Görünen ad<input id="profile-display" maxlength="40" required></label><label>Biyografi<textarea id="profile-bio" maxlength="160" placeholder="Kendinden biraz bahset..."></textarea></label><button class="btn btn-primary" type="submit">Profili kaydet</button></div></form>
-        <div class="card profile-note"><span>✦</span><div><strong>Profilin senin dijital alanın.</strong><p>Kullanıcı adın ve biyografin herkese açık profilinde görüntülenir. E-posta adresin paylaşılmaz.</p></div></div>
+        <div class="card profile-note"><div><strong>Profilin senin dijital alanın.</strong><p>Kullanıcı adın ve biyografin herkese açık profilinde görüntülenir. E-posta adresin paylaşılmaz.</p></div></div>
       </section>
       <section id="view-settings" class="view">
         <div class="page-heading"><div><div class="eyebrow">HESAP MERKEZİ</div><h1>Hesap<span class="gradient-text">.</span></h1><p>Kullanıcı adını ve giriş güvenliğini yönet.</p></div></div>
+        <section class="card settings-card theme-settings-card" aria-labelledby="theme-settings-title">
+          <div class="settings-card-heading"><span class="settings-icon">◐</span><div><div class="eyebrow">GÖRÜNÜM</div><h2 id="theme-settings-title">Görünümünü kişiselleştir</h2><p>NEXORA'yı açık veya koyu kullan; vurgu rengini kendi zevkine göre belirle.</p></div></div>
+          <div class="theme-controls">
+            <label>Arayüz teması<select id="theme-mode"><option value="dark">Karanlık</option><option value="light">Aydınlık</option></select></label>
+            <label>Vurgu rengi<div class="theme-color-row"><input id="theme-accent" type="color" value="#9ab99f"><span id="theme-accent-value">#9AB99F</span></div></label>
+          </div>
+          <div class="theme-presets" aria-label="Hazır vurgu renkleri">
+            <button type="button" class="theme-swatch" data-theme-color="#9AB99F" style="--swatch:#9ab99f" aria-label="Adaçayı yeşili"></button>
+            <button type="button" class="theme-swatch" data-theme-color="#8B7CF6" style="--swatch:#8b7cf6" aria-label="Mor"></button>
+            <button type="button" class="theme-swatch" data-theme-color="#4C9BE8" style="--swatch:#4c9be8" aria-label="Mavi"></button>
+            <button type="button" class="theme-swatch" data-theme-color="#D18A55" style="--swatch:#d18a55" aria-label="Turuncu"></button>
+            <button type="button" class="theme-swatch" data-theme-color="#D46B91" style="--swatch:#d46b91" aria-label="Pembe"></button>
+            <button type="button" class="theme-swatch" data-theme-color="#4BAF9A" style="--swatch:#4baf9a" aria-label="Turkuaz"></button>
+          </div>
+          <p class="settings-help">Seçimlerin bu cihazda otomatik olarak saklanır.</p>
+        </section>
         <form id="username-change-form" class="card settings-card username-settings-card">
           <div class="settings-card-heading"><span class="settings-icon">＠</span><div><div class="eyebrow">KULLANICI ADI</div><h2>Kullanıcı adını değiştir</h2><p>Güvenlik için mevcut şifren istenir. Kullanıcı adını 7 günde bir değiştirebilirsin.</p></div></div>
           <label>Yeni kullanıcı adı<input id="new-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]+" autocomplete="username" required placeholder="yeni_kullanici_adi"></label>
@@ -143,7 +159,7 @@
       </section>
       <section id="view-admin" class="view"><div class="page-heading"><div><div class="eyebrow">NEXORA MANAGEMENT</div><h1>Kurucu Paneli<span class="gradient-text">.</span></h1><p>Platformun genel durumunu buradan takip edebilirsin.</p></div></div><div class="admin-welcome card">♛ <div><strong>Kurucu erişimi doğrulandı</strong><p>Bu panel yalnızca kurucu hesabına gösterilir.</p></div></div><div class="admin-stats" id="admin-stats"></div><div class="card admin-members"><div class="section-row"><h2 class="section-title">Son katılan üyeler</h2><span class="muted">Kurucu görünümü</span></div><div id="admin-member-list" class="admin-member-list"><div class="loading">Yükleniyor...</div></div></div></section>
     </main>
-    <aside class="rightbar"><div class="right-card"><div class="right-title">NEXORA NOTU <span>✦</span></div><h3>Her topluluk<br>bir fikirle başlar.</h3><p>İlgi alanını keşfet, topluluğunu bul ve arkadaşlarınla bağlantı kur.</p></div><div class="right-card mini-card"><div class="right-title">PLATFORM</div><div class="stat-line"><span>Durum</span><strong class="online">● Aktif</strong></div><div class="stat-line"><span>Topluluklar</span><strong id="side-community-count">—</strong></div></div><div class="right-footer">Güvenli ve saygılı bir topluluk<br>oluşturmaya katkı sağla.</div></aside>
+    <aside class="rightbar"><div class="right-card"><div class="right-title">NEXORA NOTU</div><h3>Her topluluk<br>bir fikirle başlar.</h3><p>İlgi alanını keşfet, topluluğunu bul ve arkadaşlarınla bağlantı kur.</p></div><div class="right-card mini-card"><div class="right-title">PLATFORM</div><div class="stat-line"><span>Durum</span><strong class="online">● Aktif</strong></div><div class="stat-line"><span>Topluluklar</span><strong id="side-community-count">—</strong></div></div><div class="right-footer">Güvenli ve saygılı bir topluluk<br>oluşturmaya katkı sağla.</div></aside>
   </div>
   <dialog id="member-manage-dialog" class="auth-dialog member-manage-dialog"><form id="member-manage-form" class="member-manage-box"><button type="button" class="dialog-close" id="member-manage-close">×</button><div class="eyebrow">TOPLULUK MODERASYONU</div><h2>Üyeyi yönet</h2><label>İşlem<select id="member-manage-action"><option value="role">Rol ata</option><option value="mute">Sustur</option><option value="unmute">Susturmayı kaldır</option><option value="ban">Topluluktan yasakla</option><option value="kick">Topluluktan çıkar</option></select></label><div id="member-role-fields" class="member-manage-fields"><label>Yetki seviyesi<select id="member-manage-role"><option value="member">Üye</option><option value="moderator">Moderatör</option><option value="admin">Yönetici</option></select></label><label>Görünen rol adı<input id="member-manage-role-name" maxlength="32" placeholder="Örn. Tasarım Ekibi"></label><label>Rol rengi<input id="member-manage-role-color" type="color" value="#B58AFF"></label></div><div id="member-duration-fields" class="member-manage-fields hidden"><label>Süre<select id="member-manage-duration"><option value="10">10 dakika</option><option value="60" selected>1 saat</option><option value="1440">1 gün</option><option value="10080">7 gün</option><option value="43200">30 gün</option></select></label></div><label>Not / Sebep<textarea id="member-manage-reason" maxlength="300" placeholder="İsteğe bağlı açıklama..."></textarea></label><div class="community-settings-actions"><button type="button" class="btn btn-quiet" onclick="document.getElementById('member-manage-dialog').close()">Vazgeç</button><button class="btn btn-primary" type="submit">İşlemi uygula</button></div></form></dialog>
   <dialog id="profile-view-dialog" class="auth-dialog profile-view-dialog"><div class="profile-view-box"><button type="button" class="dialog-close" onclick="document.getElementById('profile-view-dialog').close()">×</button><div id="profile-view-content"><div class="loading">Profil yükleniyor...</div></div></div></dialog>
