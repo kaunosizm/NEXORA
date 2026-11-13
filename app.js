@@ -11,24 +11,45 @@
   const readTheme = () => {
     try {
       const saved = JSON.parse(localStorage.getItem(THEME_STORAGE_KEY) || "{}");
-      return {mode:saved.mode === "light" ? "light" : "dark", accent:validHex(saved.accent) ? saved.accent : "#9AB99F"};
+      return {mode:saved.mode === "light" ? "light" : "dark",accent:validHex(saved.accent) ? saved.accent : "#9AB99F"};
     } catch (_) { return {mode:"dark",accent:"#9AB99F"}; }
   };
   let currentTheme = readTheme();
   const applyTheme = (save = false) => {
-    document.documentElement.dataset.theme = currentTheme.mode;
-    ["--accent","--purple","--cyan","--green"].forEach(name=>document.documentElement.style.setProperty(name,currentTheme.accent));
+    const root=document.documentElement;
+    root.dataset.theme=currentTheme.mode;
+    document.body.dataset.theme=currentTheme.mode;
+    root.style.setProperty("--accent",currentTheme.accent);
+    root.style.setProperty("--purple",currentTheme.accent);
+    root.style.setProperty("--cyan",currentTheme.accent);
+    root.style.setProperty("--green",currentTheme.accent);
+    root.style.colorScheme=currentTheme.mode;
     const modeControl=$("theme-mode"),colorControl=$("theme-accent"),colorValue=$("theme-accent-value");
     if(modeControl)modeControl.value=currentTheme.mode;
     if(colorControl)colorControl.value=currentTheme.accent;
     if(colorValue)colorValue.textContent=currentTheme.accent.toUpperCase();
     document.querySelectorAll("[data-theme-color]").forEach(button=>button.classList.toggle("selected",button.dataset.themeColor.toLowerCase()===currentTheme.accent.toLowerCase()));
-    if(save){try{localStorage.setItem(THEME_STORAGE_KEY,JSON.stringify(currentTheme));}catch(_){}}
+    if(save){try{localStorage.setItem(THEME_STORAGE_KEY,JSON.stringify(currentTheme));}catch(error){console.warn("NEXORA theme preference could not be saved",error);}}
   };
   applyTheme();
-  $("theme-mode").addEventListener("change",event=>{currentTheme.mode=event.target.value==="light"?"light":"dark";applyTheme(true);});
-  $("theme-accent").addEventListener("input",event=>{if(!validHex(event.target.value))return;currentTheme.accent=event.target.value.toUpperCase();applyTheme(true);});
-  document.querySelectorAll("[data-theme-color]").forEach(button=>button.addEventListener("click",()=>{currentTheme.accent=button.dataset.themeColor.toUpperCase();applyTheme(true);}));
+  document.addEventListener("change",event=>{
+    if(event.target.id==="theme-mode"){
+      currentTheme.mode=event.target.value==="light"?"light":"dark";
+      applyTheme(true);
+    }
+  });
+  document.addEventListener("input",event=>{
+    if(event.target.id==="theme-accent"&&validHex(event.target.value)){
+      currentTheme.accent=event.target.value.toUpperCase();
+      applyTheme(true);
+    }
+  });
+  document.addEventListener("click",event=>{
+    const swatch=event.target.closest("[data-theme-color]");
+    if(!swatch)return;
+    currentTheme.accent=swatch.dataset.themeColor.toUpperCase();
+    applyTheme(true);
+  });
   const when = (value) => {
     const d = new Date(value); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("tr-TR",{dateStyle:"medium",timeStyle:"short"});
   };
