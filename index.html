@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=community-sidebar-fixed-4">
+  <link rel="stylesheet" href="style.css?v=launch-polish-5">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script defer src="app.js?v=community-sidebar-fixed-4"></script>
+  <script defer src="app.js?v=launch-polish-5"></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
@@ -156,6 +156,20 @@
           <button id="mfa-disable" class="btn btn-quiet hidden" type="button">2FA'yı devre dışı bırak</button>
           <p class="settings-help">Kurulum tamamlandığında sonraki girişlerinde bu kod istenir. Kurulum anahtarını kimseyle paylaşma.</p>
         </div>
+        <section class="card settings-card preference-settings-card">
+          <div class="settings-card-heading"><span class="settings-icon">☷</span><div><div class="eyebrow">KULLANIM TERCİHLERİ</div><h2>Arayüz davranışı</h2><p>Görünümü ve hareket yoğunluğunu kendi kullanımına göre ayarla.</p></div></div>
+          <label class="setting-switch-row"><span><strong>Kompakt görünüm</strong><small>Kart ve liste aralıklarını azaltır.</small></span><input id="pref-compact" type="checkbox"></label>
+          <label class="setting-switch-row"><span><strong>Animasyonları azalt</strong><small>Geçişleri ve hareketli efektleri sadeleştirir.</small></span><input id="pref-reduced-motion" type="checkbox"></label>
+        </section>
+        <section class="card settings-card session-settings-card">
+          <div class="settings-card-heading"><span class="settings-icon">⌑</span><div><div class="eyebrow">OTURUM GÜVENLİĞİ</div><h2>Aktif oturumların</h2><p>Bu cihaz dışındaki oturumlarını kapatabilirsin. Bu işlem diğer cihazlarda yeniden giriş gerektirir.</p></div></div>
+          <button id="signout-other-sessions" class="btn btn-quiet" type="button">Diğer cihazlardaki oturumları kapat</button>
+          <p id="session-settings-message" class="settings-help" role="status"></p>
+        </section>
+        <section class="card settings-card voice-settings-card">
+          <div class="settings-card-heading"><span class="settings-icon">♫</span><div><div class="eyebrow">SES VE İLETİŞİM</div><h2>Sesli iletişim</h2><p>Topluluklarda ses kaydı gönderme şu anda kullanılabilir. Canlı sesli odalar ise WebRTC sinyalizasyonu, TURN aktarımı ve katılımcı izinleriyle kurulmalı.</p></div></div>
+          <div class="mfa-status">Canlı sesli görüşme: Henüz etkin değil. Altyapı hazır olmadan çalışmayan bir arama düğmesi eklemiyorum.</div>
+        </section>
       </section>
       <section id="view-admin" class="view"><div class="page-heading"><div><div class="eyebrow">NEXORA MANAGEMENT</div><h1>Kurucu Paneli<span class="gradient-text">.</span></h1><p>Platformun genel durumunu buradan takip edebilirsin.</p></div></div><div class="admin-welcome card">♛ <div><strong>Kurucu erişimi doğrulandı</strong><p>Bu panel yalnızca kurucu hesabına gösterilir.</p></div></div><div class="admin-stats" id="admin-stats"></div><div class="card admin-members"><div class="section-row"><h2 class="section-title">Son katılan üyeler</h2><span class="muted">Kurucu görünümü</span></div><div id="admin-member-list" class="admin-member-list"><div class="loading">Yükleniyor...</div></div></div></section>
     </main>
