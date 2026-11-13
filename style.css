@@ -851,3 +851,49 @@ html[data-theme="light"] .toast{background:#fff;color:#202922;border-color:#dce3
   background:color-mix(in srgb,var(--accent) 28%,white)!important;
   color:#17251a!important;
 }
+
+
+/* Community workspace: keep the main navigation permanently visible on the left. */
+.layout.community-mode{
+  display:grid !important;
+  grid-template-columns:220px minmax(0,1fr) !important;
+  align-items:start;
+  gap:22px !important;
+  width:100%;
+  max-width:none;
+  min-height:calc(100vh - 76px);
+  padding:12px 18px;
+}
+.layout.community-mode .sidebar{
+  display:flex !important;
+  position:sticky !important;
+  left:auto !important;
+  top:90px !important;
+  bottom:auto !important;
+  width:auto !important;
+  height:calc(100vh - 110px) !important;
+  min-height:480px;
+  z-index:5;
+}
+.layout.community-mode .rightbar{display:none !important}
+.layout.community-mode .main{width:100%;min-width:0;max-width:none;margin:0}
+.layout.community-mode .room-sidebar{display:block}
+.layout.community-mode .room-heading-actions{flex-direction:row}
+@media(max-width:760px){
+  .layout.community-mode{
+    grid-template-columns:minmax(138px,34vw) minmax(0,1fr) !important;
+    gap:10px !important;
+    padding:8px 6px 30px;
+    overflow-x:auto;
+  }
+  .layout.community-mode .sidebar{
+    position:sticky !important;
+    top:76px !important;
+    width:auto !important;
+    height:calc(100vh - 90px) !important;
+    min-height:360px;
+    padding:10px 7px;
+  }
+  .layout.community-mode .main{min-width:0}
+  .layout.community-mode .room-heading-actions{flex-wrap:wrap}
+}
