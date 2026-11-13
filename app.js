@@ -23,6 +23,8 @@
     root.style.setProperty("--purple",currentTheme.accent);
     root.style.setProperty("--cyan",currentTheme.accent);
     root.style.setProperty("--green",currentTheme.accent);
+    root.style.setProperty("--accent-soft",`color-mix(in srgb,${currentTheme.accent} 24%,transparent)`);
+    root.style.setProperty("--accent-glow",`color-mix(in srgb,${currentTheme.accent} 26%,transparent)`);
     root.style.colorScheme=currentTheme.mode;
     const modeControl=$("theme-mode"),colorControl=$("theme-accent"),colorValue=$("theme-accent-value");
     if(modeControl)modeControl.value=currentTheme.mode;
@@ -31,6 +33,34 @@
     document.querySelectorAll("[data-theme-color]").forEach(button=>button.classList.toggle("selected",button.dataset.themeColor.toLowerCase()===currentTheme.accent.toLowerCase()));
     if(save){try{localStorage.setItem(THEME_STORAGE_KEY,JSON.stringify(currentTheme));}catch(error){console.warn("NEXORA theme preference could not be saved",error);}}
   };
+  const PREFS_KEY="nexora_preferences_v1";
+  const readPrefs=()=>{try{return JSON.parse(localStorage.getItem(PREFS_KEY)||"{}");}catch(_){return {};}};
+  let preferences=readPrefs();
+  const applyPreferences=(save=false)=>{
+    document.documentElement.dataset.compact=preferences.compact?"true":"false";
+    document.documentElement.dataset.reducedMotion=preferences.reducedMotion?"true":"false";
+    const compact=$("pref-compact"),motion=$("pref-reduced-motion");
+    if(compact)compact.checked=!!preferences.compact;
+    if(motion)motion.checked=!!preferences.reducedMotion;
+    if(save){try{localStorage.setItem(PREFS_KEY,JSON.stringify(preferences));}catch(error){console.warn("NEXORA preferences could not be saved",error);}}
+  };
+  applyPreferences();
+  document.addEventListener("change",event=>{
+    if(event.target.id==="pref-compact"){preferences.compact=event.target.checked;applyPreferences(true);}
+    if(event.target.id==="pref-reduced-motion"){preferences.reducedMotion=event.target.checked;applyPreferences(true);}
+  });
+  $("signout-other-sessions").addEventListener("click",async()=>{
+    if(!requireUser())return;
+    const button=$("signout-other-sessions"),message=$("session-settings-message");
+    button.disabled=true;message.textContent="Diğer oturumlar kapatılıyor...";
+    try{
+      const {error}=await db.auth.signOut({scope:"others"});
+      if(error)throw error;
+      message.textContent="Diğer cihazlardaki oturumlar kapatıldı.";
+      toast("Diğer oturumlar kapatıldı.");
+    }catch(error){message.textContent=error.message||"Oturumlar kapatılamadı.";}
+    finally{button.disabled=false;}
+  });
   applyTheme();
   document.addEventListener("change",event=>{
     if(event.target.id==="theme-mode"){
