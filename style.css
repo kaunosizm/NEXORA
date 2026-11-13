@@ -932,3 +932,6 @@ html[data-theme="light"] body,body[data-theme="light"]{
 }
 #signout-other-sessions:disabled{opacity:.55;cursor:wait}
 @media(max-width:650px){.settings-card-heading{gap:10px}.settings-icon{width:34px;height:34px;flex-basis:34px}}
+
+.community-delete-btn{border-color:color-mix(in srgb,#d65b62 55%,var(--line))!important;color:#e47a80!important;background:color-mix(in srgb,#d65b62 10%,var(--panel))!important}
+.community-delete-btn:hover{background:color-mix(in srgb,#d65b62 20%,var(--panel))!important}
