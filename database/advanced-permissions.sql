@@ -137,3 +137,54 @@ grant execute on function public.community_create_role(uuid,text,text,text[]) to
 grant execute on function public.community_update_role(uuid,uuid,text,text,text[]) to authenticated;
 grant execute on function public.community_delete_role(uuid,uuid) to authenticated;
 grant execute on function public.community_assign_custom_role(uuid,uuid,uuid) to authenticated;
+
+-- Existing RPCs must use the granular evaluator too.
+create or replace function public.community_assign_role(p_community_id uuid,p_target_user_id uuid,p_role text,p_role_name text default null,p_role_color text default null)
+returns void language plpgsql security definer set search_path='' as $$
+declare actor_role text; target_role text;
+begin
+ if auth.uid() is null or p_role not in ('member','moderator','admin') then raise exception 'Geçersiz istek.'; end if;
+ if not private.has_community_permission(p_community_id,'manage_members') then raise exception 'Üye yönetme yetkin yok.'; end if;
+ select role into actor_role from public.community_members where community_id=p_community_id and user_id=auth.uid();
+ select role into target_role from public.community_members where community_id=p_community_id and user_id=p_target_user_id;
+ if target_role is null or target_role='owner' or p_target_user_id=auth.uid() then raise exception 'Bu üyeye rol atanamaz.'; end if;
+ if p_role='admin' and actor_role<>'owner' and auth.uid()<>'242245a8-acf0-489a-9ba4-e9e4c1593f19'::uuid then raise exception 'Yalnızca topluluk sahibi yönetici atayabilir.'; end if;
+ if actor_role='admin' and target_role='admin' then raise exception 'Yönetici başka bir yöneticiyi değiştiremez.'; end if;
+ update public.community_members set role=p_role,custom_role_id=null,role_name=nullif(left(coalesce(p_role_name,''),32),''),role_color=case when p_role_color ~ '^#[0-9A-Fa-f]{6}$' then p_role_color else null end where community_id=p_community_id and user_id=p_target_user_id;
+end; $$;
+create or replace function public.community_moderate_member(p_community_id uuid,p_target_user_id uuid,p_action text,p_duration_minutes integer default null,p_reason text default '')
+returns void language plpgsql security definer set search_path='' as $$
+declare actor_role text; target_role text; expiry timestamptz; required_permission text;
+begin
+ if auth.uid() is null or p_action not in ('mute','unmute','ban','unban') then raise exception 'Geçersiz istek.'; end if;
+ required_permission:=case when p_action in ('mute','unmute') then 'timeout_members' else 'ban_members' end;
+ if not private.has_community_permission(p_community_id,required_permission) then raise exception 'Bu moderasyon işlemi için yetkin yok.'; end if;
+ select role into actor_role from public.community_members where community_id=p_community_id and user_id=auth.uid();
+ select role into target_role from public.community_members where community_id=p_community_id and user_id=p_target_user_id;
+ if target_role is null and p_action<>'unban' then raise exception 'Üyelik bulunamadı.'; end if;
+ if p_target_user_id=auth.uid() or target_role='owner' then raise exception 'Bu üyeye işlem uygulayamazsın.'; end if;
+ if actor_role='moderator' and target_role<>'member' then raise exception 'Moderatör yalnızca üyeleri yönetebilir.'; end if;
+ if actor_role='admin' and target_role='admin' then raise exception 'Yönetici başka bir yöneticiyi yönetemez.'; end if;
+ if p_action in ('mute','ban') and (p_duration_minutes is null or p_duration_minutes<1 or p_duration_minutes>43200) then raise exception 'Süre 1 dakika ile 30 gün arasında olmalı.'; end if;
+ expiry:=case when p_action in ('mute','ban') then now()+make_interval(mins=>p_duration_minutes) else null end;
+ insert into public.community_moderation_actions(community_id,target_user_id,moderator_id,action_type,reason,expires_at) values(p_community_id,p_target_user_id,auth.uid(),p_action,left(coalesce(p_reason,''),300),expiry);
+ if p_action='mute' then update public.community_members set muted_until=expiry,mute_reason=left(coalesce(p_reason,''),300) where community_id=p_community_id and user_id=p_target_user_id;
+ elsif p_action='unmute' then update public.community_members set muted_until=null,mute_reason=null where community_id=p_community_id and user_id=p_target_user_id;
+ elsif p_action='ban' then delete from public.community_members where community_id=p_community_id and user_id=p_target_user_id; end if;
+end; $$;
+create or replace function public.community_update_settings(p_community_id uuid,p_profanity_filter boolean,p_blocked_words text[],p_slow_mode_seconds integer,p_media_enabled boolean)
+returns void language plpgsql security definer set search_path='' as $$
+declare cleaned text[];
+begin
+ if auth.uid() is null or not private.has_community_permission(p_community_id,'manage_settings') then raise exception 'Ayarları değiştirme yetkin yok.'; end if;
+ if p_slow_mode_seconds not between 0 and 300 then raise exception 'Yavaş mod 0-300 saniye olmalı.'; end if;
+ select coalesce(array_agg(distinct left(trim(x),40)),'{}'::text[]) into cleaned from unnest(coalesce(p_blocked_words,'{}'::text[])) x where length(trim(x)) between 2 and 40;
+ insert into public.community_settings(community_id,profanity_filter,blocked_words,slow_mode_seconds,media_enabled,updated_at) values(p_community_id,coalesce(p_profanity_filter,true),cleaned,p_slow_mode_seconds,coalesce(p_media_enabled,true),now())
+ on conflict(community_id) do update set profanity_filter=excluded.profanity_filter,blocked_words=excluded.blocked_words,slow_mode_seconds=excluded.slow_mode_seconds,media_enabled=excluded.media_enabled,updated_at=now();
+end; $$;
+revoke all on function public.community_assign_role(uuid,uuid,text,text,text) from public,anon;
+revoke all on function public.community_moderate_member(uuid,uuid,text,integer,text) from public,anon;
+revoke all on function public.community_update_settings(uuid,boolean,text[],integer,boolean) from public,anon;
+grant execute on function public.community_assign_role(uuid,uuid,text,text,text) to authenticated;
+grant execute on function public.community_moderate_member(uuid,uuid,text,integer,text) to authenticated;
+grant execute on function public.community_update_settings(uuid,boolean,text[],integer,boolean) to authenticated;
