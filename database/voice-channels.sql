@@ -9,6 +9,8 @@ create table if not exists public.community_voice_channels (
 );
 create index if not exists community_voice_channels_community_sort_idx
   on public.community_voice_channels(community_id, sort_order, created_at);
+create index if not exists community_voice_channels_created_by_idx
+  on public.community_voice_channels(created_by);
 create unique index if not exists community_voice_channels_unique_name_idx
   on public.community_voice_channels(community_id, lower(name));
 
