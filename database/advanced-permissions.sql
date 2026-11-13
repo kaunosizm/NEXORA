@@ -188,3 +188,22 @@ revoke all on function public.community_update_settings(uuid,boolean,text[],inte
 grant execute on function public.community_assign_role(uuid,uuid,text,text,text) to authenticated;
 grant execute on function public.community_moderate_member(uuid,uuid,text,integer,text) to authenticated;
 grant execute on function public.community_update_settings(uuid,boolean,text[],integer,boolean) to authenticated;
+
+-- Prevent a role manager from assigning a custom role with powers they do not hold.
+create or replace function public.community_assign_custom_role(p_community_id uuid,p_target_user_id uuid,p_role_id uuid)
+returns boolean language plpgsql security definer set search_path='' as $$
+declare perm text;
+begin
+ if auth.uid() is null or not private.has_community_permission(p_community_id,'manage_members') then raise exception 'Üye yönetme yetkin yok.'; end if;
+ if not exists(select 1 from public.community_members where community_id=p_community_id and user_id=p_target_user_id and role<>'owner') or p_target_user_id=auth.uid() then raise exception 'Üye bulunamadı veya kendine rol atayamazsın.'; end if;
+ if p_role_id is not null then
+  if not exists(select 1 from public.community_roles where id=p_role_id and community_id=p_community_id) then raise exception 'Bu topluluğa ait rol seçilmedi.'; end if;
+  for perm in select unnest(r.permissions) from public.community_roles r where r.id=p_role_id loop
+   if not private.has_community_permission(p_community_id,perm) then raise exception 'Atadığın rol senin sahip olmadığın izin içeriyor: %',perm; end if;
+  end loop;
+ end if;
+ update public.community_members set custom_role_id=p_role_id,role='member',role_name=null,role_color=null where community_id=p_community_id and user_id=p_target_user_id;
+ return true;
+end; $$;
+revoke all on function public.community_assign_custom_role(uuid,uuid,uuid) from public,anon;
+grant execute on function public.community_assign_custom_role(uuid,uuid,uuid) to authenticated;
