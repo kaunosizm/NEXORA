@@ -90,7 +90,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityVoiceChannels = [], communityMembers = [], communityRole = "member", communityPermissions = new Set(), communityChannelError = null, roomChannel = null, voiceRealtimeChannel = null, activeVoiceChannel = null, voiceLocalStream = null, voiceMuted = false, voicePeers = new Map(), voicePendingCandidates = new Map(), voiceIceServers = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityVoiceChannels = [], communityMembers = [], communityRole = "member", communityPermissions = new Set(), communityChannelError = null, roomChannel = null, voiceRealtimeChannel = null, activeVoiceChannel = null, voicePreviousTextRoom = null, voiceLocalStream = null, voiceMuted = false, voicePeers = new Map(), voicePendingCandidates = new Map(), voiceIceServers = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -777,7 +777,7 @@
     if(!requireUser()||!activeCommunity)return;
     if(!communityPermissions.has("connect_voice"))return toast("Bu ses kanalına bağlanma iznin yok.");
     if(activeVoiceChannel?.id===channel.id)return;
-    await leaveVoiceChannel(false);activeVoiceChannel=channel;activeRoom=null;voiceMuted=false;updateActiveRoomHeading();
+    await leaveVoiceChannel(false);voicePreviousTextRoom=activeRoom;activeVoiceChannel=channel;activeRoom=null;voiceMuted=false;updateActiveRoomHeading();
     try{
       voiceIceServers=await getVoiceIceServers();
       if(communityPermissions.has("speak"))voiceLocalStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
@@ -802,7 +802,7 @@
     for(const pc of voicePeers.values())pc.close();voicePeers.clear();voicePendingCandidates.clear();
     if(voiceLocalStream){voiceLocalStream.getTracks().forEach(t=>t.stop());voiceLocalStream=null;}
     document.querySelectorAll(".voice-remote-audio").forEach(a=>{a.pause();a.srcObject=null;a.remove();});
-    activeVoiceChannel=null;voiceMuted=false;if(hadVoice){updateActiveRoomHeading();if(showToast)toast("Ses kanalından ayrıldın.");}
+    activeVoiceChannel=null;voiceMuted=false;if(hadVoice){if(voicePreviousTextRoom){activeRoom=voicePreviousTextRoom;activeChannel=communityChannels.find(c=>c.id===activeRoom.channel_id)||activeChannel;}voicePreviousTextRoom=null;updateActiveRoomHeading();if(showToast)toast("Ses kanalından ayrıldın.");}
   }
 
   async function subscribeToActiveRoom(){
