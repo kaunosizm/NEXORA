@@ -90,7 +90,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityMembers = [], communityRole = "member", communityPermissions = new Set(), communityChannelError = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityVoiceChannels = [], communityMembers = [], communityRole = "member", communityPermissions = new Set(), communityChannelError = null, roomChannel = null, voiceRealtimeChannel = null, activeVoiceChannel = null, voiceLocalStream = null, voiceMuted = false, voicePeers = new Map(), voicePendingCandidates = new Map(), voiceIceServers = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -662,10 +662,13 @@
   });
   async function loadCommunityStructure(preferredChannelId=null, preferredRoomId=null) {
     if(!activeCommunity)return;
-    const [channelsResult,membersResult]=await Promise.all([
+    if(activeVoiceChannel && activeVoiceChannel.community_id !== activeCommunity.id) await leaveVoiceChannel(false);
+    const [channelsResult,membersResult,voiceResult]=await Promise.all([
       db.from("community_channels").select("id,community_id,name,created_by,sort_order,created_at").eq("community_id",activeCommunity.id).order("sort_order").order("created_at"),
-      db.from("community_members").select("user_id,role,role_name,role_color,muted_until,joined_at,profiles!community_members_user_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("joined_at")
+      db.from("community_members").select("user_id,role,role_name,role_color,muted_until,joined_at,profiles!community_members_user_id_fkey(username,display_name,avatar_url)").eq("community_id",activeCommunity.id).order("joined_at"),
+      db.from("community_voice_channels").select("id,community_id,name,created_by,sort_order,created_at").eq("community_id",activeCommunity.id).order("sort_order").order("created_at")
     ]);
+    communityVoiceChannels=voiceResult.error?[]:(voiceResult.data||[]);
     communityChannelError=channelsResult.error?.message||null;
     if(channelsResult.error){$("room-channel-list").innerHTML='<p class="empty-note">Kanallar alınamadı: '+esc(channelsResult.error.message)+'</p>';communityChannels=[];}else communityChannels=channelsResult.data||[];
     if(membersResult.error){$("room-member-list").innerHTML='<p class="empty-note">Üyeler alınamadı: '+esc(membersResult.error.message)+'</p>';$("room-member-count").textContent="—";communityMembers=[];}else communityMembers=membersResult.data||[];
@@ -676,6 +679,7 @@
     $("community-settings-open").classList.toggle("hidden",!communityPermissions.has("manage_settings")&&!communityPermissions.has("manage_roles"));
     $("channel-create-toggle").classList.toggle("hidden",!canManage);
     $("room-create-toggle").classList.toggle("hidden",!canManage);
+    $("voice-create-toggle").classList.toggle("hidden",!communityPermissions.has("manage_voice"));
     $("room-member-count").textContent=String(communityMembers.length);
     if(!membersResult.error)$("room-member-list").innerHTML=communityMembers.length?communityMembers.map(m=>{
       const p=m.profiles||{},isCommunityFounder=m.user_id===activeCommunity.created_by,isPlatformFounder=m.user_id===FOUNDER_UID;
@@ -700,23 +704,106 @@
       const rooms=communityRooms.filter(r=>r.channel_id===channel.id);
       return '<div class="room-channel-group"><div class="room-channel-heading"><strong>'+esc(channel.name)+'</strong>'+(canManage?'<button class="room-add-inline" type="button" data-add-room="'+channel.id+'" title="Bu kanala oda ekle">+</button>':'')+'</div>'+rooms.map(room=>'<button type="button" class="room-link '+(activeRoom?.id===room.id?'active':'')+'" data-room-id="'+room.id+'"><span>#</span>'+esc(room.name)+'</button>').join("")+'</div>';
     }).join("")||'<p class="empty-note">Henüz kanal yok.</p>';
+    const voiceMarkup='<div class="voice-channel-section"><div class="room-channel-heading"><strong>SES KANALLARI</strong></div>'+
+      (communityVoiceChannels.map(channel=>'<button type="button" class="room-link voice-room-link '+(activeVoiceChannel?.id===channel.id?'active':'')+'" data-voice-id="'+channel.id+'"><span>◖))</span>'+esc(channel.name)+'</button>').join("")||
+      '<p class="empty-note">Henüz ses kanalı yok.</p>')+'</div>';
+    $("room-channel-list").insertAdjacentHTML("beforeend",voiceMarkup);
     $("room-channel-list").querySelectorAll("[data-room-id]").forEach(btn=>btn.addEventListener("click",async()=>{
+      if(activeVoiceChannel)await leaveVoiceChannel(false);
       const selected=communityRooms.find(r=>r.id===btn.dataset.roomId);if(!selected)return;
       activeChannel=communityChannels.find(c=>c.id===selected.channel_id)||null;activeRoom=selected;
       $("room-create-channel").value=selected.channel_id;
       renderCommunityChannels();updateActiveRoomHeading();await loadRoomMessages();await subscribeToActiveRoom();
     }));
+    $("room-channel-list").querySelectorAll("[data-voice-id]").forEach(btn=>btn.addEventListener("click",()=>{const selected=communityVoiceChannels.find(v=>v.id===btn.dataset.voiceId);if(selected)joinVoiceChannel(selected);}));
     $("room-channel-list").querySelectorAll("[data-add-room]").forEach(btn=>btn.addEventListener("click",()=>{
       $("room-create-channel").value=btn.dataset.addRoom;$("room-create-form").classList.remove("hidden");$("room-name").focus();
     }));
   }
   function updateActiveRoomHeading(){
+    if(activeVoiceChannel){$("room-channel-name").textContent="SES KANALI";$("active-room-title").textContent="◖)) "+activeVoiceChannel.name;$("active-room-topic").textContent="Sesli odada bulunan kişilerle konuş.";$("room-form").classList.add("hidden");renderVoicePanel();return;}
     $("room-channel-name").textContent=activeChannel?.name||"Kanallar";
     $("active-room-title").textContent=activeRoom?"# "+activeRoom.name:"Oda seçilmedi";
     $("active-room-topic").textContent=activeRoom?.topic||"Bu odada topluluk üyeleriyle paylaşım yap.";
     $("room-form").classList.toggle("hidden",!activeRoom);
     $("room-messages").innerHTML=activeRoom?'<div class="loading">Mesajlar yükleniyor...</div>':'<div class="room-empty">Mesajlaşmak için bir oda oluşturulmasını veya seçilmesini bekle.</div>';
   }
+
+  function renderVoicePanel(){
+    const box=$("room-messages");if(!box||!activeVoiceChannel)return;
+    const states=voiceRealtimeChannel?.presenceState?.()||{},people=[];
+    Object.values(states).forEach(entries=>(entries||[]).forEach(entry=>{if(entry.user_id&&!people.some(p=>p.user_id===entry.user_id))people.push(entry);}));
+    if(user&&!people.some(p=>p.user_id===user.id))people.push({user_id:user.id,display_name:profile?.display_name||profile?.username||"Sen",username:profile?.username||"sen",muted:voiceMuted});
+    box.innerHTML='<div class="voice-room-panel"><div class="voice-room-status"><span class="voice-live-dot"></span><strong>Ses bağlantısı '+(voiceRealtimeChannel?'kuruldu':'hazırlanıyor')+'</strong><span>'+people.length+' kişi</span></div><div class="voice-participant-grid">'+(people.map(p=>'<div class="voice-participant"><div class="voice-participant-avatar">'+esc((p.display_name||p.username||"N").slice(0,1).toUpperCase())+'</div><strong>'+esc(p.display_name||p.username||"Üye")+'</strong><small>'+(p.user_id===user?.id?'Sen':('@'+esc(p.username||"uye")))+'</small><span>'+(p.muted?'Mikrofon kapalı':'Mikrofon açık')+'</span></div>').join("")||'<p class="empty-note">Bağlantı bekleniyor...</p>')+'</div><div id="voice-audio-grid" class="voice-audio-grid"></div><div class="voice-controls"><button type="button" class="btn btn-quiet" id="voice-mute-btn">'+(voiceMuted?'Mikrofonu aç':'Mikrofonu kapat')+'</button><button type="button" class="btn btn-danger" id="voice-leave-btn">Ses kanalından ayrıl</button></div><p class="voice-help">Tarayıcı mikrofon izni ister. Kulaklık kullanmak yankıyı azaltır.</p></div>';
+    box.querySelector("#voice-mute-btn")?.addEventListener("click",toggleVoiceMute);
+    box.querySelector("#voice-leave-btn")?.addEventListener("click",()=>leaveVoiceChannel(true));
+  }
+  async function getVoiceIceServers(){
+    if(voiceIceServers)return voiceIceServers;
+    const {data:{session}}=await db.auth.getSession();
+    if(!session?.access_token)throw new Error("Oturum doğrulanamadı. Yeniden giriş yap.");
+    const response=await fetch(cfg.SUPABASE_URL+"/functions/v1/voice-ice-servers",{headers:{Authorization:"Bearer "+session.access_token,apikey:cfg.SUPABASE_PUBLISHABLE_KEY}});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||"Ses bağlantısı sunucusu yanıt vermedi.");
+    if(!Array.isArray(payload.iceServers)||!payload.iceServers.length)throw new Error("Ses bağlantı sunucuları alınamadı.");
+    voiceIceServers=payload.iceServers;return voiceIceServers;
+  }
+  async function sendVoiceSignal(to,payload){if(voiceRealtimeChannel)await voiceRealtimeChannel.send({type:"broadcast",event:"signal",payload:{to,from:user.id,...payload}});}
+  function createVoicePeer(peerId,initiator=false){
+    if(voicePeers.has(peerId))return voicePeers.get(peerId);
+    const pc=new RTCPeerConnection({iceServers:voiceIceServers||[{urls:"stun:stun.l.google.com:19302"}]});voicePeers.set(peerId,pc);
+    voiceLocalStream?.getAudioTracks().forEach(track=>pc.addTrack(track,voiceLocalStream));
+    pc.onicecandidate=e=>{if(e.candidate)sendVoiceSignal(peerId,{candidate:e.candidate.toJSON()});};
+    pc.ontrack=e=>{let audio=document.getElementById("voice-audio-"+peerId);if(!audio){audio=document.createElement("audio");audio.id="voice-audio-"+peerId;audio.autoplay=true;audio.playsInline=true;audio.className="voice-remote-audio";$("voice-audio-grid")?.appendChild(audio);}audio.srcObject=e.streams[0];audio.play().catch(()=>toast("Sesi duymak için sayfada bir kez etkileşim kur."));};
+    pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState)){pc.close();voicePeers.delete(peerId);}};
+    if(initiator)pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>sendVoiceSignal(peerId,{description:pc.localDescription.toJSON()})).catch(e=>console.warn("NEXORA voice offer",e));
+    return pc;
+  }
+  async function handleVoiceSignal(payload){
+    if(!payload||payload.to!==user?.id||!payload.from||payload.from===user.id)return;
+    const pc=createVoicePeer(payload.from,false);
+    if(payload.description){await pc.setRemoteDescription(payload.description);if(payload.description.type==="offer"){const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await sendVoiceSignal(payload.from,{description:pc.localDescription.toJSON()});}const queued=voicePendingCandidates.get(payload.from)||[];voicePendingCandidates.delete(payload.from);for(const c of queued)await pc.addIceCandidate(c).catch(()=>{});}
+    if(payload.candidate){if(pc.remoteDescription)await pc.addIceCandidate(payload.candidate).catch(()=>{});else{const q=voicePendingCandidates.get(payload.from)||[];q.push(payload.candidate);voicePendingCandidates.set(payload.from,q);}}
+  }
+  async function syncVoicePeers(){
+    if(!voiceRealtimeChannel)return;
+    const state=voiceRealtimeChannel.presenceState(),present=new Set();
+    Object.entries(state).forEach(([key,entries])=>(entries||[]).forEach(entry=>{const id=entry.user_id||key;if(id&&id!==user.id){present.add(id);if(user.id.localeCompare(id)<0)createVoicePeer(id,true);}}));
+    for(const [id,pc] of voicePeers){if(!present.has(id)){pc.close();voicePeers.delete(id);document.getElementById("voice-audio-"+id)?.remove();}}
+    renderVoicePanel();
+  }
+  async function joinVoiceChannel(channel){
+    if(!requireUser()||!activeCommunity)return;
+    if(!communityPermissions.has("connect_voice"))return toast("Bu ses kanalına bağlanma iznin yok.");
+    if(activeVoiceChannel?.id===channel.id)return;
+    await leaveVoiceChannel(false);activeVoiceChannel=channel;activeRoom=null;voiceMuted=false;updateActiveRoomHeading();
+    try{
+      voiceIceServers=await getVoiceIceServers();
+      if(communityPermissions.has("speak"))voiceLocalStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      voiceRealtimeChannel=db.channel("voice:"+channel.community_id+":"+channel.id,{config:{private:true,presence:{key:user.id}}});
+      voiceRealtimeChannel.on("broadcast",{event:"signal"},({payload})=>handleVoiceSignal(payload).catch(e=>console.warn("NEXORA voice signal",e)));
+      voiceRealtimeChannel.on("presence",{event:"sync"},syncVoicePeers).on("presence",{event:"join"},syncVoicePeers).on("presence",{event:"leave"},syncVoicePeers);
+      voiceRealtimeChannel.subscribe(async status=>{
+        if(status==="SUBSCRIBED"){await voiceRealtimeChannel.track({user_id:user.id,username:profile?.username||"uye",display_name:profile?.display_name||profile?.username||"Üye",muted:voiceMuted});await syncVoicePeers();renderVoicePanel();}
+        else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT")toast("Ses kanalına bağlanılamadı. Realtime izinlerini kontrol et.");
+      });
+    }catch(e){await leaveVoiceChannel(false);toast(e.name==="NotAllowedError"?"Mikrofon izni verilmedi. Tarayıcı ayarlarından izin verip tekrar dene.":(e.message||"Ses kanalına bağlanılamadı."));}
+  }
+  async function toggleVoiceMute(){
+    if(!voiceLocalStream)return toast("Mikrofon kullanma iznin yok.");
+    voiceMuted=!voiceMuted;voiceLocalStream.getAudioTracks().forEach(t=>t.enabled=!voiceMuted);
+    if(voiceRealtimeChannel)await voiceRealtimeChannel.track({user_id:user.id,username:profile?.username||"uye",display_name:profile?.display_name||profile?.username||"Üye",muted:voiceMuted});
+    renderVoicePanel();
+  }
+  async function leaveVoiceChannel(showToast=false){
+    const hadVoice=!!activeVoiceChannel||!!voiceRealtimeChannel||!!voiceLocalStream;
+    if(voiceRealtimeChannel){try{await voiceRealtimeChannel.untrack();}catch(_){}await db.removeChannel(voiceRealtimeChannel);voiceRealtimeChannel=null;}
+    for(const pc of voicePeers.values())pc.close();voicePeers.clear();voicePendingCandidates.clear();
+    if(voiceLocalStream){voiceLocalStream.getTracks().forEach(t=>t.stop());voiceLocalStream=null;}
+    document.querySelectorAll(".voice-remote-audio").forEach(a=>{a.pause();a.srcObject=null;a.remove();});
+    activeVoiceChannel=null;voiceMuted=false;if(hadVoice){updateActiveRoomHeading();if(showToast)toast("Ses kanalından ayrıldın.");}
+  }
+
   async function subscribeToActiveRoom(){
     if(roomChannel){await db.removeChannel(roomChannel);roomChannel=null;}
     if(!activeRoom)return;
@@ -769,6 +856,8 @@
 
   $("channel-create-toggle").addEventListener("click",()=>{$("channel-create-form").classList.toggle("hidden");if(!$("channel-create-form").classList.contains("hidden"))$("channel-name").focus();});
   $("room-create-toggle").addEventListener("click",()=>{$("room-create-form").classList.toggle("hidden");$("room-create-channel").value=activeChannel?.id||"";if(!$("room-create-form").classList.contains("hidden"))$("room-name").focus();});
+  $("voice-create-toggle").addEventListener("click",()=>{$("voice-create-form").classList.toggle("hidden");if(!$("voice-create-form").classList.contains("hidden"))$("voice-channel-name").focus();});
+  $("voice-create-form").addEventListener("submit",async e=>{e.preventDefault();if(!requireUser()||!activeCommunity)return;if(!communityPermissions.has("manage_voice"))return toast("Ses kanalı oluşturma iznin yok.");const name=$("voice-channel-name").value.trim();if(name.length<2)return toast("Ses kanalı adı en az 2 karakter olmalı.");const {error}=await db.from("community_voice_channels").insert({community_id:activeCommunity.id,name,created_by:user.id,sort_order:communityVoiceChannels.length});if(error)return toast(error.message);$("voice-channel-name").value="";$("voice-create-form").classList.add("hidden");await loadCommunityStructure();toast("Ses kanalı oluşturuldu.");});
   $("channel-create-form").addEventListener("submit",async e=>{
     e.preventDefault();if(!requireUser()||!activeCommunity)return;
     const name=$("channel-name").value.trim();if(name.length<2)return toast("Kanal adı en az 2 karakter olmalı.");
