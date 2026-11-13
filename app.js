@@ -81,7 +81,7 @@
   const setView = (name) => {
     document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
     document.querySelectorAll(".nav-item").forEach(v => v.classList.toggle("active", v.dataset.view === name));
-    const appLayout=document.querySelector(".layout");appLayout.classList.toggle("community-mode",name==="community-room");appLayout.classList.remove("community-nav-open");if($("community-menu-toggle"))$("community-menu-toggle").setAttribute("aria-expanded","false");
+    const appLayout=document.querySelector(".layout");appLayout.classList.toggle("community-mode",name==="community-room");
     if (name === "home") loadHome();
     if (name === "communities") loadCommunities();
     if (name === "friends") loadFriends();
@@ -172,11 +172,6 @@
     finally{button.disabled=false;}
   });
   $("room-back").addEventListener("click",()=>setView("communities"));
-  const communityLayout=document.querySelector(".layout");
-  const setCommunityMenu=(open)=>{communityLayout.classList.toggle("community-nav-open",open);$("community-menu-toggle").setAttribute("aria-expanded",String(open));};
-  $("community-menu-toggle").addEventListener("click",e=>{e.stopPropagation();setCommunityMenu(!communityLayout.classList.contains("community-nav-open"));});
-  document.addEventListener("click",e=>{if(communityLayout.classList.contains("community-mode")&&communityLayout.classList.contains("community-nav-open")&&!e.target.closest(".sidebar")&&!e.target.closest("#community-menu-toggle"))setCommunityMenu(false);});
-  document.addEventListener("keydown",e=>{if(e.key==="Escape")setCommunityMenu(false);});
   $("sidebar-logout").addEventListener("click",async()=>{if(user&&confirm("Çıkış yapmak istiyor musun?")){await db.auth.signOut();toast("Çıkış yapıldı.");}});
 
   let globalSearchType="all",globalSearchTimer=null;
