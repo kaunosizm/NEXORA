@@ -1026,3 +1026,9 @@ dialog.community-roles-dialog{
 .voice-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
 .voice-help{text-align:center;font-size:10px;color:var(--muted);margin:14px 0 0}
 @media(max-width:600px){.voice-room-panel{margin:12px 0;padding:15px}.voice-participant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.voice-room-row{display:flex;align-items:center;gap:4px}
+.voice-room-row .voice-room-link{flex:1;min-width:0}
+.voice-room-delete{width:25px;height:25px;flex:0 0 25px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:17px;cursor:pointer}
+.voice-room-delete:hover{background:color-mix(in srgb,#d65b62 17%,var(--panel));color:#e47a80}
+.voice-controls button:disabled{opacity:.55;cursor:not-allowed}
