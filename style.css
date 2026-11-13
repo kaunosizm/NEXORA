@@ -810,3 +810,44 @@ html[data-theme="light"] .toast{background:#fff;color:#202922;border-color:#dce3
 @media(max-width:700px){
   html[data-theme="light"] .sidebar,body[data-theme="light"] .sidebar{background:rgba(255,255,255,.97);border-color:#dce3dc}
 }
+
+
+/* NEXORA contrast boost: clearer accent and brighter interactive states */
+:root{--accent:#9fcca7;--purple:var(--accent);--cyan:var(--accent);--green:var(--accent)}
+.btn-primary,.btn.btn-primary{
+  background:color-mix(in srgb,var(--accent) 42%,var(--panel))!important;
+  border-color:color-mix(in srgb,var(--accent) 78%,white 8%)!important;
+  color:color-mix(in srgb,var(--accent) 25%,white)!important;
+}
+.btn-primary:hover,.btn.btn-primary:hover{
+  background:color-mix(in srgb,var(--accent) 56%,var(--panel))!important;
+  border-color:var(--accent)!important;
+}
+.nav-item.active,.nav-item:hover{
+  color:color-mix(in srgb,var(--accent) 68%,white)!important;
+  background:color-mix(in srgb,var(--accent) 24%,var(--panel))!important;
+}
+.nav-item.active{box-shadow:inset 3px 0 var(--accent)!important}
+.room-link{color:color-mix(in srgb,var(--text) 78%,var(--accent))}
+.room-link span,.room-channel-heading{color:color-mix(in srgb,var(--accent) 72%,var(--text))}
+.room-link:hover,.room-link.active{
+  background:color-mix(in srgb,var(--accent) 27%,var(--panel))!important;
+  border-color:color-mix(in srgb,var(--accent) 72%,var(--line))!important;
+  color:var(--text)!important;
+}
+.room-add-inline,.icon-action,.theme-swatch.selected{
+  border-color:color-mix(in srgb,var(--accent) 72%,var(--line));
+}
+.user-chip,.community-symbol,.room-member-avatar,.room-message-actions button{
+  background:color-mix(in srgb,var(--accent) 23%,var(--panel))!important;
+  border-color:color-mix(in srgb,var(--accent) 45%,var(--line))!important;
+}
+[data-theme="light"] .btn-primary,[data-theme="light"] .btn.btn-primary{
+  background:color-mix(in srgb,var(--accent) 34%,white)!important;
+  color:#17251a!important;border-color:color-mix(in srgb,var(--accent) 72%,#fff)!important;
+}
+[data-theme="light"] .nav-item.active,[data-theme="light"] .nav-item:hover,
+[data-theme="light"] .room-link.active,[data-theme="light"] .room-link:hover{
+  background:color-mix(in srgb,var(--accent) 28%,white)!important;
+  color:#17251a!important;
+}
