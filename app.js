@@ -91,7 +91,7 @@
     if (name === "admin") loadAdmin();
     window.scrollTo({top:0,behavior:"smooth"});
   };
-  document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+  document.querySelectorAll(".sidebar .nav-item[data-view]").forEach(b => b.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); setView(b.dataset.view); }));
   document.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => setView(b.dataset.go)));
   $("auth-open").addEventListener("click", () => showAuth("login"));
   $("welcome-login").addEventListener("click", () => showAuth("login"));
