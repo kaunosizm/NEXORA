@@ -358,9 +358,22 @@
       const isPrivate=c.visibility==="private";
       const action=joined.has(c.id)?`<button class="btn btn-primary" data-open-community="${c.id}">Topluluğu aç ↗</button>`:
         (isPrivate?(ownRequests.has(c.id)?`<button class="btn btn-quiet" disabled>${ownRequests.get(c.id)==="pending"?"İstek gönderildi":"İstek: "+(ownRequests.get(c.id)==="approved"?"onaylandı":"reddedildi")}</button>`:`<button class="btn btn-quiet" data-request="${c.id}">Katılma isteği gönder</button>`):`<button class="btn btn-quiet" data-join="${c.id}">Topluluğa katıl +</button>`);
-      return `<article class="card community-card"><div class="community-symbol">${["◉","▦","⌘","◌"][i%4]}</div><div class="community-visibility">${isPrivate?"🔒 GİZLİ":"● HERKESE AÇIK"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${action}</div></article>`;
+      const founderDelete=user?.id===FOUNDER_UID?`<button class="btn btn-danger community-delete-btn" data-founder-delete="${c.id}" type="button">Topluluğu sil</button>`:"";
+      return `<article class="card community-card"><div class="community-symbol">${["◉","▦","⌘","◌"][i%4]}</div><div class="community-visibility">${isPrivate?"🔒 GİZLİ":"● HERKESE AÇIK"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${action}${founderDelete}</div></article>`;
     }).join("");
     listBox.querySelectorAll("[data-open-community]").forEach(btn=>btn.addEventListener("click",()=>openCommunity(data.find(c=>c.id===btn.dataset.openCommunity))));
+    listBox.querySelectorAll("[data-founder-delete]").forEach(btn=>btn.addEventListener("click",async()=>{
+      if(user?.id!==FOUNDER_UID)return toast("Bu işlem yalnızca kurucuya açık.");
+      const community=data.find(c=>c.id===btn.dataset.founderDelete);if(!community)return;
+      const confirmation=window.prompt("Kalıcı silme için topluluk adını aynen yaz: "+community.name);
+      if(confirmation!==community.name)return toast("Silme işlemi iptal edildi.");
+      btn.disabled=true;
+      const removed=await db.from("communities").delete().eq("id",community.id);
+      if(removed.error){btn.disabled=false;return toast("Topluluk silinemedi: "+removed.error.message);}
+      if(activeCommunity?.id===community.id){activeCommunity=null;activeRoom=null;setView("communities");}
+      toast("Topluluk ve ilişkili kayıtları silindi.");await loadCommunities(targetId);
+    }));
+
     listBox.querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
       if(!requireUser())return; const {error:joinError}=await db.from("community_members").insert({community_id:btn.dataset.join,user_id:user.id,role:"member"});
       if(joinError && !joinError.message.includes("duplicate"))return toast(joinError.message);
