@@ -6,6 +6,29 @@
     clearTimeout(window.__nexoraToast); window.__nexoraToast = setTimeout(() => el.classList.remove("show"), 2800);
   };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const THEME_STORAGE_KEY = "nexora_theme_v1";
+  const validHex = value => /^#[0-9a-f]{6}$/i.test(value || "");
+  const readTheme = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(THEME_STORAGE_KEY) || "{}");
+      return {mode:saved.mode === "light" ? "light" : "dark", accent:validHex(saved.accent) ? saved.accent : "#9AB99F"};
+    } catch (_) { return {mode:"dark",accent:"#9AB99F"}; }
+  };
+  let currentTheme = readTheme();
+  const applyTheme = (save = false) => {
+    document.documentElement.dataset.theme = currentTheme.mode;
+    ["--accent","--purple","--cyan","--green"].forEach(name=>document.documentElement.style.setProperty(name,currentTheme.accent));
+    const modeControl=$("theme-mode"),colorControl=$("theme-accent"),colorValue=$("theme-accent-value");
+    if(modeControl)modeControl.value=currentTheme.mode;
+    if(colorControl)colorControl.value=currentTheme.accent;
+    if(colorValue)colorValue.textContent=currentTheme.accent.toUpperCase();
+    document.querySelectorAll("[data-theme-color]").forEach(button=>button.classList.toggle("selected",button.dataset.themeColor.toLowerCase()===currentTheme.accent.toLowerCase()));
+    if(save){try{localStorage.setItem(THEME_STORAGE_KEY,JSON.stringify(currentTheme));}catch(_){}}
+  };
+  applyTheme();
+  $("theme-mode").addEventListener("change",event=>{currentTheme.mode=event.target.value==="light"?"light":"dark";applyTheme(true);});
+  $("theme-accent").addEventListener("input",event=>{if(!validHex(event.target.value))return;currentTheme.accent=event.target.value.toUpperCase();applyTheme(true);});
+  document.querySelectorAll("[data-theme-color]").forEach(button=>button.addEventListener("click",()=>{currentTheme.accent=button.dataset.themeColor.toUpperCase();applyTheme(true);}));
   const when = (value) => {
     const d = new Date(value); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("tr-TR",{dateStyle:"medium",timeStyle:"short"});
   };
@@ -289,7 +312,7 @@
       const isPrivate=c.visibility==="private";
       const action=joined.has(c.id)?`<button class="btn btn-primary" data-open-community="${c.id}">Topluluğu aç ↗</button>`:
         (isPrivate?(ownRequests.has(c.id)?`<button class="btn btn-quiet" disabled>${ownRequests.get(c.id)==="pending"?"İstek gönderildi":"İstek: "+(ownRequests.get(c.id)==="approved"?"onaylandı":"reddedildi")}</button>`:`<button class="btn btn-quiet" data-request="${c.id}">Katılma isteği gönder</button>`):`<button class="btn btn-quiet" data-join="${c.id}">Topluluğa katıl +</button>`);
-      return `<article class="card community-card"><div class="community-symbol">${["✦","◈","⌘","✧"][i%4]}</div><div class="community-visibility">${isPrivate?"🔒 GİZLİ":"● HERKESE AÇIK"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${action}</div></article>`;
+      return `<article class="card community-card"><div class="community-symbol">${["◉","▦","⌘","◌"][i%4]}</div><div class="community-visibility">${isPrivate?"🔒 GİZLİ":"● HERKESE AÇIK"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description||"Bu toplulukta yeni fikirler keşfet.")}</p><small>/c/${esc(c.slug)}</small><div class="community-card-actions">${action}</div></article>`;
     }).join("");
     listBox.querySelectorAll("[data-open-community]").forEach(btn=>btn.addEventListener("click",()=>openCommunity(data.find(c=>c.id===btn.dataset.openCommunity))));
     listBox.querySelectorAll("[data-join]").forEach(btn=>btn.addEventListener("click",async()=>{
