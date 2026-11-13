@@ -897,3 +897,38 @@ html[data-theme="light"] .toast{background:#fff;color:#202922;border-color:#dce3
   .layout.community-mode .main{min-width:0}
   .layout.community-mode .room-heading-actions{flex-wrap:wrap}
 }
+
+
+/* Launch polish: accent-driven ambient lighting, +75% intensity over the previous glow. */
+body{
+  background:
+    radial-gradient(ellipse at 14% 8%,color-mix(in srgb,var(--accent) 25%,transparent),transparent 43%),
+    radial-gradient(ellipse at 88% 42%,color-mix(in srgb,var(--accent) 17%,transparent),transparent 40%),
+    var(--bg)!important;
+  background-attachment:fixed!important;
+}
+.ambient-one,.ambient-two{background:var(--accent)!important;opacity:.24!important;filter:blur(100px)}
+.ambient-two{opacity:.16!important}
+html[data-theme="light"] body,body[data-theme="light"]{
+  background:
+    radial-gradient(ellipse at 12% 8%,color-mix(in srgb,var(--accent) 23%,transparent),transparent 44%),
+    radial-gradient(ellipse at 90% 48%,color-mix(in srgb,var(--accent) 15%,transparent),transparent 42%),
+    #f3f5f2!important;
+  background-attachment:fixed!important;
+}
+.settings-card-heading{display:flex;align-items:flex-start;gap:14px}
+.settings-icon{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border-radius:13px;background:color-mix(in srgb,var(--accent) 22%,var(--panel));color:var(--accent);font-size:20px}
+.setting-switch-row{display:flex!important;align-items:center;justify-content:space-between;gap:18px;padding:14px 15px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
+.setting-switch-row span{display:grid;gap:4px}
+.setting-switch-row strong{font-size:13px;color:var(--text)}
+.setting-switch-row small{font-size:11px;color:var(--muted);font-weight:400}
+.setting-switch-row input{width:19px!important;height:19px;accent-color:var(--accent);flex:0 0 auto}
+[data-compact="true"] .card{padding-top:16px;padding-bottom:16px}
+[data-compact="true"] .layout{gap:24px}
+[data-compact="true"] .nav-item{padding-top:9px;padding-bottom:9px}
+[data-compact="true"] .community-grid{gap:12px}
+[data-reduced-motion="true"] *,[data-reduced-motion="true"] *::before,[data-reduced-motion="true"] *::after{
+  animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important
+}
+#signout-other-sessions:disabled{opacity:.55;cursor:wait}
+@media(max-width:650px){.settings-card-heading{gap:10px}.settings-icon{width:34px;height:34px;flex-basis:34px}}
