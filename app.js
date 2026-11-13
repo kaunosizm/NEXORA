@@ -530,6 +530,11 @@
     $("member-manage-role-color").value="#B58AFF";
     $("member-manage-duration").value="60";
     $("member-manage-reason").value="";
+    $("member-custom-role").innerHTML='<option value="">Varsayılan rolü kullan</option>';
+    const roleResult=await db.from("community_roles").select("id,name,color").eq("community_id",activeCommunity.id).order("position",{ascending:false});
+    if(!roleResult.error)$("member-custom-role").innerHTML+=(roleResult.data||[]).map(r=>'<option value="'+r.id+'">'+esc(r.name)+'</option>').join("");
+    const memberResult=await db.from("community_members").select("custom_role_id").eq("community_id",activeCommunity.id).eq("user_id",targetId).maybeSingle();
+    if(memberResult.data?.custom_role_id)$("member-custom-role").value=memberResult.data.custom_role_id;
     updateMemberManageFields();
     $("member-manage-dialog").showModal();
   }
@@ -545,7 +550,13 @@
     const action=$("member-manage-action").value;
     let result;
     if(action==="role"){
-      result=await db.rpc("community_assign_role",{p_community_id:activeCommunity.id,p_target_user_id:managingMemberId,p_role:$("member-manage-role").value,p_role_name:$("member-manage-role-name").value.trim()||null,p_role_color:$("member-manage-role-color").value||null});
+      const customRoleId=$("member-custom-role").value;
+      if(customRoleId){
+        result=await db.rpc("community_assign_custom_role",{p_community_id:activeCommunity.id,p_target_user_id:managingMemberId,p_role_id:customRoleId});
+      }else{
+        result=await db.rpc("community_assign_role",{p_community_id:activeCommunity.id,p_target_user_id:managingMemberId,p_role:$("member-manage-role").value,p_role_name:$("member-manage-role-name").value.trim()||null,p_role_color:$("member-manage-role-color").value||null});
+        if(!result.error){const cleared=await db.from("community_members").update({custom_role_id:null}).eq("community_id",activeCommunity.id).eq("user_id",managingMemberId);if(cleared.error)result=cleared;}
+      }
     }else if(action==="mute"||action==="ban"||action==="unmute"){
       const duration=action==="unmute"?null:Number($("member-manage-duration").value);
       if(action!=="unmute"&&(!Number.isInteger(duration)||duration<1||duration>43200))return toast("Süre 1-43200 dakika olmalı.");
@@ -558,6 +569,49 @@
     $("member-manage-dialog").close();managingMemberId=null;
     toast(action==="role"?"Üye rolü güncellendi.":action==="mute"?"Üye susturuldu.":action==="ban"?"Üye yasaklandı.":action==="unmute"?"Susturma kaldırıldı.":"Üye topluluktan çıkarıldı.");
     await loadCommunityStructure(activeChannel?.id,activeRoom?.id);
+  });
+
+  const COMMUNITY_PERMISSION_DEFS=[["manage_community","Topluluğu yönet","Genel yönetim ve topluluk sahipliği dışındaki temel kontroller"],["manage_settings","Ayarları yönet","Topluluk ayarlarını değiştirme"],["manage_channels","Kanalları yönet","Kategori, kanal ve oda oluşturma, düzenleme, silme"],["manage_roles","Rolleri yönet","Rol ve izin oluşturma, düzenleme, silme"],["manage_members","Üyeleri yönet","Üyelere rol atama ve üye işlemleri"],["kick_members","Üyeleri çıkar","Üyeyi topluluktan çıkarma"],["ban_members","Üyeleri yasakla","Topluluğa erişimi yasaklama"],["timeout_members","Üyeleri sustur","Geçici mesaj kısıtlaması uygulama"],["manage_messages","Mesajları yönet","Mesaj moderasyonu"],["delete_messages","Mesaj sil","Başka üyelerin mesajlarını silme ve sohbeti temizleme"],["pin_messages","Mesaj sabitle","Önemli mesajları sabitleme"],["send_messages","Mesaj gönder","Metin kanallarına yazma"],["attach_files","Dosya ekle","Fotoğraf ve ses ekleri gönderme"],["mention_everyone","Herkesi etiketle","Topluluk genelini etiketleme (altyapı aşamalı)"],["create_invites","Davet oluştur","Davet bağlantısı üretme (altyapı aşamalı)"],["manage_invites","Davetleri yönet","Davetleri iptal etme (altyapı aşamalı)"],["view_audit_log","Denetim kaydını gör","Yönetim işlem geçmişi (altyapı aşamalı)"],["manage_voice","Ses odalarını yönet","Sesli oda ayarlarını yönetme (altyapı aşamalı)"],["connect_voice","Ses odasına katıl","Sesli odaya bağlanma (altyapı aşamalı)"],["speak","Konuş","Sesli odada mikrofon kullanma (altyapı aşamalı)"]];
+  function renderRolePermissions(selected=[]){
+    $("community-role-permissions").innerHTML=COMMUNITY_PERMISSION_DEFS.map(([key,label,desc])=>'<label class="permission-option"><input type="checkbox" value="'+key+'" '+(selected.includes(key)?"checked":"")+'><span><strong>'+label+'</strong><small>'+desc+'</small></span></label>').join("");
+  }
+  function resetRoleEditor(){
+    $("community-role-id").value="";$("community-role-name").value="";$("community-role-color").value="#8B9BB4";
+    renderRolePermissions([]);$("community-role-message").textContent="";
+  }
+  async function loadCommunityRoles(){
+    if(!activeCommunity)return;
+    const {data,error}=await db.from("community_roles").select("id,name,color,position,permissions,is_default").eq("community_id",activeCommunity.id).order("position",{ascending:false}).order("created_at");
+    if(error){$("community-role-list").innerHTML='<p class="empty-note">'+esc(error.message)+'</p>';return;}
+    const roles=data||[];
+    $("community-role-list").innerHTML=roles.map(role=>'<div class="community-role-row"><button type="button" class="community-role-edit" data-role-edit="'+role.id+'"><i style="background:'+esc(role.color)+'"></i><span>'+esc(role.name)+'</span><small>'+role.permissions.length+' izin</small></button>'+(!role.is_default?'<button type="button" class="community-role-delete" data-role-delete="'+role.id+'" aria-label="Rolü sil">×</button>':'')+'</div>').join("")||'<p class="empty-note">Henüz özel rol yok. İlk rolünü oluştur.</p>';
+    $("community-role-list").querySelectorAll("[data-role-edit]").forEach(btn=>btn.addEventListener("click",()=>{
+      const role=roles.find(x=>x.id===btn.dataset.roleEdit);if(!role)return;
+      $("community-role-id").value=role.id;$("community-role-name").value=role.name;$("community-role-color").value=role.color;renderRolePermissions(role.permissions||[]);$("community-role-message").textContent="Rol düzenleniyor.";
+    }));
+    $("community-role-list").querySelectorAll("[data-role-delete]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const role=roles.find(x=>x.id===btn.dataset.roleDelete);if(!role||!confirm('"'+role.name+'" rolünü silmek istiyor musun? Üyeler varsayılan role döner.'))return;
+      const removed=await db.rpc("community_delete_role",{p_community_id:activeCommunity.id,p_role_id:role.id});
+      if(removed.error)return toast(removed.error.message);
+      toast("Rol silindi.");resetRoleEditor();await loadCommunityRoles();
+    }));
+  }
+  $("community-roles-open").addEventListener("click",async()=>{
+    if(!activeCommunity)return;
+    $("community-roles-dialog").showModal();resetRoleEditor();await loadCommunityRoles();
+  });
+  $("community-roles-close").addEventListener("click",()=>$("community-roles-dialog").close());
+  $("role-create-open").addEventListener("click",resetRoleEditor);
+  $("role-cancel-edit").addEventListener("click",resetRoleEditor);
+  $("role-clear-permissions").addEventListener("click",()=>renderRolePermissions([]));
+  $("community-role-form").addEventListener("submit",async e=>{
+    e.preventDefault();if(!activeCommunity)return;
+    const roleId=$("community-role-id").value;
+    const permissions=[...$("community-role-permissions").querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value);
+    const args={p_community_id:activeCommunity.id,p_name:$("community-role-name").value.trim(),p_color:$("community-role-color").value,p_permissions:permissions};
+    const result=roleId?await db.rpc("community_update_role",{...args,p_role_id:roleId}):await db.rpc("community_create_role",args);
+    if(result.error){$("community-role-message").textContent=result.error.message;return;}
+    $("community-role-message").textContent="Rol kaydedildi.";toast("Rol ve izinler kaydedildi.");resetRoleEditor();await loadCommunityRoles();
   });
   async function openCommunitySettings(){
     if(!activeCommunity)return;
