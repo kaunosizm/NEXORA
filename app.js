@@ -90,7 +90,7 @@
   }
   const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
   const FOUNDER_UID = "242245a8-acf0-489a-9ba4-e9e4c1593f19";
-  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityMembers = [], communityRole = "member", communityChannelError = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
+  let user = null, profile = null, authMode = "signup", activeCommunity = null, activeChannel = null, activeRoom = null, communityChannels = [], communityRooms = [], communityMembers = [], communityRole = "member", communityPermissions = new Set(), communityChannelError = null, roomChannel = null, mediaRecorder = null, recordingChunks = [], authRevision = 0, mfaSetupFactorId = null, mfaSetupChallengeId = null, mfaLoginActive = false, activeDm = null, dmChannel = null;
   const setConnection = (ok, label) => {
     $("connection-state").innerHTML = "<i></i> " + esc(label);
     $("connection-state").style.color = ok ? "var(--green)" : "#f1c77b";
@@ -515,6 +515,8 @@
     const {data:member,error:memberError}=await db.from("community_members").select("community_id,role").eq("community_id",community.id).eq("user_id",user.id).maybeSingle();
     if(memberError||!member) return toast("Bu topluluğun üyesi olmalısın.");
     activeCommunity=community; communityRole=member.role||"member";
+    const permissionResult=await db.rpc("community_get_my_permissions",{p_community_id:community.id});
+    communityPermissions=new Set(permissionResult.data||[]);
     $("room-title").textContent=community.name;
     $("room-description").textContent=community.description||"Topluluğun kanalları ve üyeleri.";
     setView("community-room");
@@ -621,21 +623,24 @@
     ]);
     if(settings.error||community.error)return toast((settings.error||community.error).message);
     $("community-setting-name").value=community.data.name||"";
-    const canEditDetails=activeCommunity.created_by===user.id;
+    const canEditDetails=communityPermissions.has("manage_settings")||activeCommunity.created_by===user.id;
     $("community-setting-name").disabled=!canEditDetails;$("community-setting-description").disabled=!canEditDetails;$("community-setting-visibility").disabled=!canEditDetails;
-    $("community-settings-form").querySelector('button[type="submit"]').classList.toggle("hidden",!(communityRole==="owner"||communityRole==="admin"));
+    $("community-settings-form").querySelector('button[type="submit"]').classList.toggle("hidden",!communityPermissions.has("manage_settings"));
     $("community-setting-description").value=community.data.description||"";
     $("community-setting-visibility").value=community.data.visibility||"public";
     $("community-profanity-filter").checked=settings.data?.profanity_filter??true;
     $("community-blocked-words").value=(settings.data?.blocked_words||[]).join(", ");
     $("community-slow-mode").value=String(settings.data?.slow_mode_seconds||0);
     $("community-media-enabled").checked=settings.data?.media_enabled??true;
+    $("community-roles-open").classList.toggle("hidden",!communityPermissions.has("manage_roles"));
+    $("community-clear-chat").classList.toggle("hidden",!communityPermissions.has("delete_messages"));
     $("community-settings-dialog").showModal();
   }
   $("community-settings-open").addEventListener("click",openCommunitySettings);
   $("community-settings-close").addEventListener("click",()=>$("community-settings-dialog").close());
   $("community-settings-form").addEventListener("submit",async e=>{
     e.preventDefault();if(!activeCommunity)return;
+    if(!communityPermissions.has("manage_settings"))return toast("Ayarları değiştirme yetkin yok.");
     const settings=await db.rpc("community_update_settings",{p_community_id:activeCommunity.id,p_profanity_filter:$("community-profanity-filter").checked,p_blocked_words:$("community-blocked-words").value.split(",").map(x=>x.trim()).filter(Boolean),p_slow_mode_seconds:Number($("community-slow-mode").value),p_media_enabled:$("community-media-enabled").checked});
     if(settings.error)return toast(settings.error.message);
     if(activeCommunity.created_by===user.id){
@@ -647,7 +652,8 @@
     $("community-settings-dialog").close();toast("Topluluk ayarları kaydedildi.");
   });
   $("community-clear-chat").addEventListener("click",async()=>{
-    if(!activeCommunity||!confirm("Bu topluluğun tüm sohbet mesajları kalıcı olarak silinsin mi?"))return;
+    if(!activeCommunity||!communityPermissions.has("delete_messages"))return toast("Mesaj silme yetkin yok.");
+    if(!confirm("Bu topluluğun tüm sohbet mesajları kalıcı olarak silinsin mi?"))return;
     const r=await db.from("community_messages").delete().eq("community_id",activeCommunity.id);
     if(r.error)return toast(r.error.message);toast("Topluluk sohbeti temizlendi.");await loadRoomMessages();
   });
@@ -663,15 +669,15 @@
     const ids=communityChannels.map(c=>c.id);
     const roomsResult=ids.length?await db.from("community_rooms").select("id,community_id,channel_id,name,topic,created_by,sort_order,created_at").in("channel_id",ids).order("sort_order").order("created_at"):{data:[],error:null};
     if(roomsResult.error){communityChannelError="Odalar alınamadı: "+roomsResult.error.message;$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';communityRooms=[];}else communityRooms=roomsResult.data||[];
-    const canManage=communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity.created_by===user?.id;
-    $("community-settings-open").classList.toggle("hidden",!(communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity.created_by===user?.id));
+    const canManage=communityPermissions.has("manage_channels");
+    $("community-settings-open").classList.toggle("hidden",!communityPermissions.has("manage_settings")&&!communityPermissions.has("manage_roles"));
     $("channel-create-toggle").classList.toggle("hidden",!canManage);
     $("room-create-toggle").classList.toggle("hidden",!canManage);
     $("room-member-count").textContent=String(communityMembers.length);
     if(!membersResult.error)$("room-member-list").innerHTML=communityMembers.length?communityMembers.map(m=>{
       const p=m.profiles||{},isCommunityFounder=m.user_id===activeCommunity.created_by,isPlatformFounder=m.user_id===FOUNDER_UID;
       const label=isCommunityFounder?"KURUCU":isPlatformFounder?"NEXORA KURUCU":m.role_name||({admin:"YÖNETİCİ",moderator:"MODERATÖR",member:"ÜYE"}[m.role]||"ÜYE");
-      const canAct=!isCommunityFounder&&m.user_id!==user?.id&&(communityRole==="owner"||communityRole==="admin"||(communityRole==="moderator"&&m.role==="member"));
+      const canAct=!isCommunityFounder&&m.user_id!==user?.id&&(communityPermissions.has("manage_members")||communityPermissions.has("kick_members")||communityPermissions.has("timeout_members")||communityPermissions.has("ban_members"));
       return '<div class="room-member"><button type="button" class="room-member-profile" data-profile-view="'+m.user_id+'"><span class="room-member-avatar">'+(p.avatar_url?'<img src="'+esc(p.avatar_url)+'" alt="">':esc((p.display_name||p.username||"N").slice(0,1).toUpperCase()))+'</span><span class="room-member-name"><strong class="'+(isPlatformFounder?'founder-name':'')+'">'+esc(p.display_name||p.username||"Üye")+'</strong><small>@'+esc(p.username||"uye")+'</small></span></button><span class="room-member-role '+(isCommunityFounder||isPlatformFounder?'founder-name':'')+'" '+(m.role_color?'style="color:'+esc(m.role_color)+'"':'')+'>'+esc(label)+'</span>'+(canAct?'<button class="room-member-manage" type="button" data-manage-member="'+m.user_id+'" data-member-role="'+esc(m.role)+'">•••</button>':'')+'</div>';
     }).join(""):'<p class="empty-note">Henüz üye yok.</p>';
     $("room-member-list").querySelectorAll("[data-manage-member]").forEach(btn=>btn.addEventListener("click",()=>manageCommunityMember(btn.dataset.manageMember,btn.dataset.memberRole)));
@@ -685,7 +691,7 @@
     await loadRoomMessages();
   }
   function renderCommunityChannels(){
-    const canManage=communityRole==="owner"||communityRole==="admin"||communityRole==="moderator"||activeCommunity?.created_by===user?.id;
+    const canManage=communityPermissions.has("manage_channels");
     if(communityChannelError){$("room-channel-list").innerHTML='<p class="empty-note">'+esc(communityChannelError)+'</p>';return;}
     $("room-channel-list").innerHTML=communityChannels.map(channel=>{
       const rooms=communityRooms.filter(r=>r.channel_id===channel.id);
